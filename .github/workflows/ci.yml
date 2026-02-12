@@ -1,0 +1,53 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          # Mapăm portul 5433 de la "exterior" la 5432 "interior"
+          # ca să se potrivească cu ce ai tu în cod/configurări
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.14
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.14-dev' # Folosim versiunea de development 3.14
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Syntax Check
+      env:
+        # Injectăm variabilele de mediu necesare pentru ca codul să nu crape la pornire
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5433/test_db
+        SECRET_KEY: secret_pentru_teste
+        ALGORITHM: HS256
+      run: |
+        cd backend
+        # Această comandă verifică dacă toate importurile și sintaxa sunt OK
+        python -m compileall .

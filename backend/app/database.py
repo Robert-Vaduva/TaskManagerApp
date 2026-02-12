@@ -1,0 +1,24 @@
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+# URL-ul de conexiune (trebuie să bată cu ce ai pus în docker-compose.yml)
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+# Dependency pentru a deschide/închide sesiunea de DB automat
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

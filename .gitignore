@@ -1,0 +1,18 @@
+# --- Folders (Anywhere in project) ---
+**/__pycache__/
+**/.venv/
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+build/
+postgres_data/
+
+# --- Specific Files ---
+.env
+.DS_Store
+*.pyc
+.packages
+
+# --- Mobile/OS Specific ---
+frontend/ios/.generated/
+frontend/macos/Flutter/ephemeral/
