@@ -76,7 +76,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not security.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Email sau parolă incorectă")
 
-    token = create_access_token(data={"sub": user.email})
+    token = create_access_token(data={"sub": str(user.id)})
     return {"status": "success", "access_token": token, "token_type": "bearer"}
 
 
