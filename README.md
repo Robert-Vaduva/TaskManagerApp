@@ -12,6 +12,8 @@ A modern, modular, and secure boilerplate for commercial applications, built wit
 git clone <url-ul-tau>
 cd MyFirstApp
 cp backend/.env.example backend/.env
+# Generate unique ssl secret key
+openssl rand -hex 32
 Editeaza .env cu datele tale.
 
 ### 2. Launch Infrastructure (Docker)

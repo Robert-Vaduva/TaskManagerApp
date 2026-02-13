@@ -13,4 +13,4 @@ class UserOut(UserBase):
     is_active: bool
 
     class Config:
-        from_attributes = True # Permite maparea obiectelor SQLAlchemy
+        from_attributes = True

@@ -10,5 +10,6 @@ class Settings:
     ALGORITHM: str = os.getenv("ALGORITHM")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     ALLOWED_ORIGINS: list = os.getenv("ALLOWED_ORIGINS", "").split(",")
+    API_V1_STR: str = "/api/v1"
 
 settings = Settings()
