@@ -24,6 +24,7 @@ app.include_router(user.router, prefix="/users", tags=["Users"])
 app.include_router(task.router, prefix="/tasks", tags=["Tasks"])
 
 @app.get("/api/v1/salut")
+@app.get("/")
 async def hello():
     return {
         "status": "succes",

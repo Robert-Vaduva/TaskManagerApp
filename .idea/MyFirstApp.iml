@@ -12,6 +12,7 @@
     <orderEntry type="module" module-name="backend" />
     <orderEntry type="module" module-name="frontend" />
     <orderEntry type="library" name="Dart SDK" level="project" />
+    <orderEntry type="library" name="Dart Packages" level="project" />
   </component>
   <component name="PyDocumentationSettings">
     <option name="format" value="PLAIN" />

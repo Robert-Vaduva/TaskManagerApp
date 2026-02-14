@@ -31,7 +31,7 @@ class TaskService {
   }
 
   // 2. Creează un task nou
-  Future<Task> createTask(String token, String title, String description) async {
+  Future<Task> createTask(String token, String title, String description, String priority) async {
     final response = await http.post(
       Uri.parse('$baseUrl/'),
       headers: {
@@ -41,7 +41,7 @@ class TaskService {
       body: jsonEncode({
         "title": title,
         "description": description,
-        "priority": "medium", // Poți extinde asta ulterior cu un dropdown în UI
+        "priority": priority,
       }),
     );
 
