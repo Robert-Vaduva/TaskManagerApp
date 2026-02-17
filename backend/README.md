@@ -16,3 +16,6 @@ Logger:
 from app.core.logger import logger
 logger.info("Cineva a încercat să se logheze")
 logger.error(f"Eroare critică la login: {str(e)}")
+
+Flutter:
+flutter run -d chrome

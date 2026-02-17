@@ -17,6 +17,7 @@ class TaskCreate(TaskBase):
 class Task(TaskBase):
     id: int
     owner_id: int
+    is_completed: bool
     created_at: datetime
 
     class Config:

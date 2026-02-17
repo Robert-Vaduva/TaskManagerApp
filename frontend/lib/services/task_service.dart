@@ -7,7 +7,7 @@ class TaskService {
   // 127.0.0.1 pentru Web/Desktop, 10.0.2.2 pentru Emulator Android
   final String baseUrl = "http://127.0.0.1:8000/tasks";
 
-  // 1. Obține toate task-urile utilizatorului logat
+
   Future<List<Task>> getTasks(String token) async {
     final response = await http.get(
       Uri.parse('$baseUrl/'),
@@ -30,7 +30,6 @@ class TaskService {
     }
   }
 
-  // 2. Creează un task nou
   Future<Task> createTask(String token, String title, String description, String priority) async {
     final response = await http.post(
       Uri.parse('$baseUrl/'),
@@ -52,8 +51,6 @@ class TaskService {
     }
   }
 
-  // 3. Actualizează statusul unui task (Complete / Incomplete)
-  // Folosim PATCH pentru a trimite doar câmpul is_completed
   Future<void> updateTaskStatus(String token, int taskId, bool isCompleted) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/$taskId'),
@@ -71,7 +68,25 @@ class TaskService {
     }
   }
 
-  // 4. Șterge un task
+  Future<void> updateTask(String token, int taskId, String title, String description, String priority) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/$taskId'),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "title": title,
+        "description": description,
+        "priority": priority,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Eroare la editarea task-ului');
+    }
+  }
+
   Future<void> deleteTask(String token, int taskId) async {
     final response = await http.delete(
       Uri.parse('$baseUrl/$taskId'),

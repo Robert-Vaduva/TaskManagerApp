@@ -15,7 +15,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-# Dependency pentru a deschide/închide sesiunea de DB automat
 def get_db():
     db = SessionLocal()
     try:

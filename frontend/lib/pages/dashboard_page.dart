@@ -17,6 +17,9 @@ class _DashboardPageState extends State<DashboardPage> {
   final TaskService _taskService = TaskService();
   late Future<List<Task>> _tasksFuture;
 
+  String _selectedFilter = 'Toate';
+  String _searchQuery = "";
+
   @override
   void initState() {
     super.initState();
@@ -31,7 +34,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Detectăm dacă suntem în Dark Mode pentru a ajusta culorile header-ului
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -39,12 +41,8 @@ class _DashboardPageState extends State<DashboardPage> {
         title: const Text("DevBros Tasks", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
-        elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshTasks,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _refreshTasks),
           IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () => Navigator.push(
@@ -61,19 +59,26 @@ class _DashboardPageState extends State<DashboardPage> {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text("Eroare: ${snapshot.error}"));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Column(
-              children: [
-                _buildHeader(isDarkMode),
-                const Expanded(child: Center(child: Text("Nu ai task-uri momentan."))),
-              ],
-            );
           }
 
-          final tasks = snapshot.data!;
+          final allTasks = snapshot.data ?? [];
 
-          // SORTARE: Task-urile nefinalizate primele
-          tasks.sort((a, b) {
+          // FILTRARE COMBINATĂ (Status + Căutare)
+          final filteredTasks = allTasks.where((t) {
+            // 1. Verificăm filtrul de status (Toate/Active/Finalizate)
+            bool matchesStatus = true;
+            if (_selectedFilter == 'Active') matchesStatus = !t.isCompleted;
+            if (_selectedFilter == 'Finalizate') matchesStatus = t.isCompleted;
+
+            // 2. Verificăm dacă textul căutat se află în titlu sau descriere
+            bool matchesSearch = t.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                                 (t.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+
+            return matchesStatus && matchesSearch;
+          }).toList();
+
+          // 2. SORTARE (Ne-finalizate primele)
+          filteredTasks.sort((a, b) {
             if (a.isCompleted == b.isCompleted) return 0;
             return a.isCompleted ? 1 : -1;
           });
@@ -81,13 +86,22 @@ class _DashboardPageState extends State<DashboardPage> {
           return Column(
             children: [
               _buildHeader(isDarkMode),
-              _buildStatsHeader(tasks),
+              _buildStatsHeader(allTasks),
+              _buildFilterRow(), // Rândul de filtre
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(top: 8, bottom: 80),
-                  itemCount: tasks.length,
-                  itemBuilder: (context, index) => _buildTaskCard(tasks[index]),
-                ),
+                child: filteredTasks.isEmpty
+                  ? const Center(child: Text("Niciun task găsit."))
+                  : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      itemCount: filteredTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = filteredTasks[index];
+                        return GestureDetector(
+                          onLongPress: () => _showEditTaskDialog(task), // Editare la long press
+                          child: _buildTaskCard(task),
+                        );
+                      },
+                    ),
               ),
             ],
           );
@@ -103,6 +117,81 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // WIDGET FILTRE
+  Widget _buildFilterRow() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: ['Toate', 'Active', 'Finalizate'].map((filter) {
+          bool isSelected = _selectedFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filter),
+              selected: isSelected,
+              onSelected: (val) {
+                if (val) setState(() => _selectedFilter = filter);
+              },
+              selectedColor: Colors.indigo.shade100,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // DIALOG EDITARE
+  void _showEditTaskDialog(Task task) {
+    final titleController = TextEditingController(text: task.title);
+    final descController = TextEditingController(text: task.description);
+    String selectedPriority = task.priority;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Editează Task"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: "Titlu")),
+                TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedPriority,
+                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
+                  items: ['low', 'medium', 'high'].map((p) =>
+                    DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
+                  onChanged: (val) => setDialogState(() => selectedPriority = val!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
+            ElevatedButton(
+              onPressed: () async {
+                await _taskService.updateTask(
+                  widget.token,
+                  task.id,
+                  titleController.text,
+                  descController.text,
+                  selectedPriority
+                );
+                Navigator.pop(context);
+                _refreshTasks();
+              },
+              child: const Text("Salvează"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Reutilizăm widget-urile tale existente (Header, Stats, Card)
   Widget _buildHeader(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -115,7 +204,28 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           Text("Salut, ${widget.email.split('@')[0]}!",
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const Text("Iată progresul tău de astăzi:"),
+          const Text("Gestionează-ți eficient timpul."),
+          const SizedBox(height: 15),
+
+          // BARA DE CĂUTARE
+          TextField(
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value; // Actualizăm query-ul la fiecare tastă apăsată
+              });
+            },
+            decoration: InputDecoration(
+              hintText: "Caută un task...",
+              prefixIcon: const Icon(Icons.search, color: Colors.indigo),
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.white,
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -123,13 +233,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildStatsHeader(List<Task> tasks) {
     int completed = tasks.where((t) => t.isCompleted).length;
-    int total = tasks.length;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          _statCard("Total", total.toString(), Colors.blue),
+          _statCard("Total", tasks.length.toString(), Colors.blue),
           const SizedBox(width: 12),
           _statCard("Gata", completed.toString(), Colors.green),
         ],
@@ -159,20 +267,29 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildTaskCard(Task task) {
     return Card(
       elevation: 0.5,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: _getPriorityColor(task.priority).withOpacity(0.2), width: 1),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: GestureDetector(
           onTap: () async {
             try {
-              await _taskService.updateTaskStatus(widget.token, task.id, !task.isCompleted);
+              // Trimitem valoarea opusă celei actuale
+              bool newStatus = !task.isCompleted;
+              await _taskService.updateTaskStatus(widget.token, task.id, newStatus);
+
+              // Forțăm reîmprospătarea listei după ce primim confirmarea de la server
               _refreshTasks();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(newStatus ? "Task finalizat!" : "Task redeschis"),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Eroare server: $e")),
+              );
             }
           },
           child: Icon(
@@ -189,15 +306,7 @@ class _DashboardPageState extends State<DashboardPage> {
             color: task.isCompleted ? Colors.grey : null,
           ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (task.description != null && task.description!.isNotEmpty)
-              Text(task.description!, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 4),
-            _buildPriorityChip(task.priority),
-          ],
-        ),
+        subtitle: _buildPriorityChip(task.priority),
         trailing: IconButton(
           icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
           onPressed: () => _confirmDelete(task.id),
@@ -218,12 +327,9 @@ class _DashboardPageState extends State<DashboardPage> {
     Color color = _getPriorityColor(priority);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(priority.toUpperCase(),
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      child: Text(priority.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -232,7 +338,6 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Ștergi task-ul?"),
-        content: const Text("Această acțiune nu poate fi anulată."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Nu")),
           ElevatedButton(
@@ -259,34 +364,27 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text("Adaugă Task Nou"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: titleController, decoration: const InputDecoration(labelText: "Titlu")),
-                TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
-                const SizedBox(height: 15),
-                DropdownButtonFormField<String>(
-                  value: selectedPriority,
-                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
-                  items: ['low', 'medium', 'high'].map((p) =>
-                    DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
-                  onChanged: (val) => setDialogState(() => selectedPriority = val!),
-                ),
-              ],
-            ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleController, decoration: const InputDecoration(labelText: "Titlu")),
+              TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
+              const SizedBox(height: 15),
+              DropdownButtonFormField<String>(
+                initialValue: selectedPriority,
+                decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
+                items: ['low', 'medium', 'high'].map((p) =>
+                  DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
+                onChanged: (val) => setDialogState(() => selectedPriority = val!),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
             ElevatedButton(
               onPressed: () async {
                 if (titleController.text.isNotEmpty) {
-                  await _taskService.createTask(
-                    widget.token,
-                    titleController.text,
-                    descController.text,
-                    selectedPriority // <--- Acesta este al 4-lea argument
-                  );
+                  await _taskService.createTask(widget.token, titleController.text, descController.text, selectedPriority);
                   Navigator.pop(context);
                   _refreshTasks();
                 }
