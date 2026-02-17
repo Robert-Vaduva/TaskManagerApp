@@ -59,10 +59,23 @@ class _DashboardPageState extends State<DashboardPage> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _refreshTasks),
           IconButton(
             icon: const Icon(Icons.account_circle),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ProfilePage(email: widget.email)),
-            ),
+            onPressed: () async {
+              // Așteptăm rezultatul de la ProfilePage (noul email dacă se schimbă)
+              final updatedEmail = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(
+                    email: widget.email,
+                    token: widget.token, // 1. TRIMITEM TOKEN-UL NECESAR API-ULUI
+                  ),
+                ),
+              );
+
+              // 2. DACĂ USERUL ȘI-A SCHIMBAT EMAIL-UL, REÎMPROSPĂTĂM UI-UL
+              if (updatedEmail != null && updatedEmail != widget.email) {
+                _refreshTasks(); // Opțional, dacă vrei să reîncarci totul
+              }
+            },
           ),
         ],
       ),
@@ -127,18 +140,29 @@ class _DashboardPageState extends State<DashboardPage> {
               _buildFilterRow(), // Rândul de filtre
               Expanded(
                 child: filteredTasks.isEmpty
-                  ? const Center(child: Text("Niciun task găsit."))
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 80),
-                      itemCount: filteredTasks.length,
-                      itemBuilder: (context, index) {
-                        final task = filteredTasks[index];
-                        return GestureDetector(
-                          onLongPress: () => _showEditTaskDialog(task), // Editare la long press
-                          child: _buildTaskCard(task),
-                        );
-                      },
-                    ),
+                    ? const Center(child: Text("Niciun task găsit."))
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          _refreshTasks();
+                          // Așteptăm un mic delay pentru a lăsa animația să fie vizibilă
+                          await Future.delayed(const Duration(milliseconds: 500));
+                        },
+                        color: Colors.white,
+                        backgroundColor: Colors.indigo,
+                        child: ListView.builder(
+                          // Important: Physics-ul acesta permite pull-to-refresh chiar și când lista e scurtă
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 80),
+                          itemCount: filteredTasks.length,
+                          itemBuilder: (context, index) {
+                            final task = filteredTasks[index];
+                            return GestureDetector(
+                              onLongPress: () => _showEditTaskDialog(task),
+                              child: _buildTaskCard(task),
+                            );
+                          },
+                        ),
+                      ),
               ),
             ],
           );
