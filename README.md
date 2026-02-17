@@ -29,3 +29,4 @@ uv run uvicorn main:app --reload
 cd frontend
 flutter pub get
 flutter run
+flutter run -d chrome --web-port=3000

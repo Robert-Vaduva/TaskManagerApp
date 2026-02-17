@@ -18,4 +18,7 @@ logger.info("Cineva a încercat să se logheze")
 logger.error(f"Eroare critică la login: {str(e)}")
 
 Flutter:
-flutter run -d chrome
+cd frontend
+flutter pub get
+flutter run
+flutter run -d chrome --web-port=3000

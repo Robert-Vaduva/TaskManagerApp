@@ -19,6 +19,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String _selectedFilter = 'Toate';
   String _searchQuery = "";
+  String _sortBy = 'priority';
 
   @override
   void initState() {
@@ -42,6 +43,19 @@ class _DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            onSelected: (String value) {
+              setState(() {
+                _sortBy = value;
+              });
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(value: 'priority', child: Text('Sortează după Prioritate')),
+              const PopupMenuItem(value: 'date', child: Text('Sortează după cele mai noi')),
+              const PopupMenuItem(value: 'alpha', child: Text('Sortează Alfabetic')),
+            ],
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _refreshTasks),
           IconButton(
             icon: const Icon(Icons.account_circle),
@@ -63,24 +77,47 @@ class _DashboardPageState extends State<DashboardPage> {
 
           final allTasks = snapshot.data ?? [];
 
-          // FILTRARE COMBINATĂ (Status + Căutare)
+          // 1. FILTRARE COMBINATĂ (Status + Căutare)
           final filteredTasks = allTasks.where((t) {
-            // 1. Verificăm filtrul de status (Toate/Active/Finalizate)
+            // Filtru de status
             bool matchesStatus = true;
             if (_selectedFilter == 'Active') matchesStatus = !t.isCompleted;
             if (_selectedFilter == 'Finalizate') matchesStatus = t.isCompleted;
 
-            // 2. Verificăm dacă textul căutat se află în titlu sau descriere
+            // Filtru de căutare
             bool matchesSearch = t.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                                  (t.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
 
             return matchesStatus && matchesSearch;
           }).toList();
 
-          // 2. SORTARE (Ne-finalizate primele)
+          // 2. SORTARE AVANSATĂ
           filteredTasks.sort((a, b) {
-            if (a.isCompleted == b.isCompleted) return 0;
-            return a.isCompleted ? 1 : -1;
+            // CRITERIUL 1: Task-urile nefinalizate apar mereu primele
+            if (a.isCompleted != b.isCompleted) {
+              return a.isCompleted ? 1 : -1;
+            }
+
+            // CRITERIUL 2: Dacă au același status, sortăm după preferința utilizatorului (_sortBy)
+            switch (_sortBy) {
+              case 'priority':
+                // Mapăm prioritățile la valori numerice pentru comparare
+                const priorityWeights = {'high': 0, 'medium': 1, 'low': 2};
+                int weightA = priorityWeights[a.priority.toLowerCase()] ?? 1;
+                int weightB = priorityWeights[b.priority.toLowerCase()] ?? 1;
+                return weightA.compareTo(weightB);
+
+              case 'date':
+                // Sortăm după ID descrescător (presupunând că ID mai mare = task mai nou)
+                return b.id.compareTo(a.id);
+
+              case 'alpha':
+                // Sortare alfabetică A-Z
+                return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+
+              default:
+                return 0;
+            }
           });
 
           return Column(
@@ -205,13 +242,28 @@ class _DashboardPageState extends State<DashboardPage> {
           Text("Salut, ${widget.email.split('@')[0]}!",
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const Text("Gestionează-ți eficient timpul."),
+
+          // --- TEXT DINAMIC SORTARE ---
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.sort, size: 14, color: Colors.indigo.withOpacity(0.7)),
+              const SizedBox(width: 4),
+              Text(
+                "Sortat după: ${_sortBy == 'priority' ? 'Prioritate' : _sortBy == 'date' ? 'Cele mai noi' : 'Nume'}",
+                style: TextStyle(fontSize: 12, color: Colors.indigo.withOpacity(0.7)),
+              ),
+            ],
+          ),
+          // ----------------------------
+
           const SizedBox(height: 15),
 
           // BARA DE CĂUTARE
           TextField(
             onChanged: (value) {
               setState(() {
-                _searchQuery = value; // Actualizăm query-ul la fiecare tastă apăsată
+                _searchQuery = value;
               });
             },
             decoration: InputDecoration(
