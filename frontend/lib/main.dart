@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/pages/auth_page.dart';
+import 'package:frontend/services/notification_service.dart'; // Importă noul serviciu
 
-void main() {
+void main() async {
+  // 1. Necesar pentru a rula cod asincron înainte de runApp
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. Inițializăm serviciul de notificări
+  final notificationService = NotificationService();
+  await notificationService.initNotification();
+
   runApp(const MyApp());
 }
 
@@ -25,7 +33,7 @@ class MyApp extends StatelessWidget {
         colorSchemeSeed: Colors.indigo,
         brightness: Brightness.dark,
       ),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.system, // Comută automat între Light/Dark bazat pe sistem
       home: const AuthPage(),
     );
   }

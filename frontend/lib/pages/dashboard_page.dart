@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/task_model.dart';
 import '../services/task_service.dart';
+import '../services/notification_service.dart'; // IMPORT NOU
 import 'profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -15,6 +16,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   final TaskService _taskService = TaskService();
+  final NotificationService _notificationService = NotificationService(); // INSTANȚĂ NOUĂ
   late Future<List<Task>> _tasksFuture;
 
   String _selectedFilter = 'Toate';
@@ -83,6 +85,16 @@ class _DashboardPageState extends State<DashboardPage> {
               if (updatedEmail != null && updatedEmail != widget.email) {
                 _refreshTasks();
               }
+            },
+          ),
+          IconButton(//rova remove this button
+            icon: const Icon(Icons.notifications_active),
+            onPressed: () async {
+              print("Testare notificare imediată...");
+              await _notificationService.showInstantNotification(
+                "Salut!",
+                "Dacă vezi asta, notificările merg pe Simulator!"
+              );
             },
           ),
         ],
@@ -209,7 +221,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<String>(
-                  value: selectedPriority.toLowerCase(),
+                  initialValue: selectedPriority.toLowerCase(),
                   decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
                   items: ['low', 'medium', 'high'].map((p) =>
                     DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
@@ -240,6 +252,17 @@ class _DashboardPageState extends State<DashboardPage> {
                   widget.token, task.id, titleController.text,
                   descController.text, selectedPriority, selectedDeadline,
                 );
+
+                // --- PROGRAMARE NOTIFICARE LA EDITARE ---
+                if (selectedDeadline != null) {
+                  await _notificationService.scheduleNotification(
+                    task.id,
+                    "Task actualizat!",
+                    "Termenul pentru '${titleController.text}' este acum.",
+                    selectedDeadline!, // <--- Și aici punem !
+                  );
+                }
+
                 Navigator.pop(context);
                 _refreshTasks();
               },
@@ -288,7 +311,6 @@ class _DashboardPageState extends State<DashboardPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- DESCRIEREA TASK-ULUI ---
             if (task.description != null && task.description!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -296,7 +318,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   task.description!,
                   style: TextStyle(
                     fontSize: 14,
-                    // Aici forțăm culoarea să fie albă sau adaptivă
                     color: task.isCompleted
                         ? Colors.grey
                         : Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
@@ -328,7 +349,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
 
-            // --- INFORMAȚIE LAST UPDATE ---
             if (task.updatedAt != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -383,7 +403,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<String>(
-                  value: selectedPriority,
+                  initialValue: selectedPriority,
                   decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
                   items: ['low', 'medium', 'high'].map((p) =>
                     DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
@@ -411,10 +431,22 @@ class _DashboardPageState extends State<DashboardPage> {
             ElevatedButton(
               onPressed: () async {
                 if (titleController.text.isNotEmpty) {
-                  await _taskService.createTask(
+                  // Capturăm obiectul Task creat pentru a-i lua ID-ul
+                  final newTask = await _taskService.createTask(
                     widget.token, titleController.text, descController.text,
                     selectedPriority, selectedDeadline,
                   );
+
+                  // --- PROGRAMARE NOTIFICARE LA CREARE ---
+                  if (selectedDeadline != null) {
+                    await _notificationService.scheduleNotification(
+                      newTask.id,
+                      "Deadline Task!",
+                      "Task-ul '${newTask.title}' a ajuns la termen.",
+                      selectedDeadline!, // <--- Aici punem !
+                    );
+                  }
+
                   Navigator.pop(context);
                   _refreshTasks();
                 }
@@ -427,7 +459,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // --- WIDGETS DE SUPORT (HEADER & STATS) ---
   Widget _buildHeader(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
