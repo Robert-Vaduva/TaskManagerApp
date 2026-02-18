@@ -26,7 +26,8 @@ class _AuthPageState extends State<AuthPage> {
     });
 
     // Ajustează URL-ul: 10.0.2.2 pentru emulator Android, 127.0.0.1 pentru Web/Desktop
-    final String baseUrl = "http://127.0.0.1:8000/api/v1/auth";
+    //rova final String baseUrl = "http://127.0.0.1:8000/api/v1/auth";
+    final String baseUrl = "http://192.168.178.112:8000/api/v1/auth";
     final url = Uri.parse(isLogin ? '$baseUrl/login' : '$baseUrl/register');
 
     try {

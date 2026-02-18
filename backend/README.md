@@ -1,5 +1,6 @@
 Go to Terminal and open /backend
 uv run uvicorn main:app --reload
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload (to run APP on iPhone)
 pip freeze > requirements.txt
 
 Docker commands:
