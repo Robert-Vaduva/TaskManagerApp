@@ -3,10 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/task_model.dart';
 
 class TaskService {
-  // Ajustează URL-ul în funcție de mediul de testare:
-  // 127.0.0.1 pentru Web/Desktop, 10.0.2.2 pentru Emulator Android
   final String baseUrl = "http://127.0.0.1:8000/tasks";
-
 
   Future<List<Task>> getTasks(String token) async {
     final response = await http.get(
@@ -18,7 +15,6 @@ class TaskService {
     );
 
     if (response.statusCode == 401) {
-      // Aici poți folosi un Stream sau o notificare globală pentru Logout
       throw Exception('Sesiune expirată. Te rugăm să te loghezi din nou.');
     }
 
@@ -30,7 +26,7 @@ class TaskService {
     }
   }
 
-  Future<Task> createTask(String token, String title, String description, String priority) async {
+  Future<Task> createTask(String token, String title, String description, String priority, DateTime? deadline) async {
     final response = await http.post(
       Uri.parse('$baseUrl/'),
       headers: {
@@ -41,6 +37,7 @@ class TaskService {
         "title": title,
         "description": description,
         "priority": priority,
+        "deadline": deadline?.toIso8601String(),
       }),
     );
 
@@ -68,7 +65,7 @@ class TaskService {
     }
   }
 
-  Future<void> updateTask(String token, int taskId, String title, String description, String priority) async {
+  Future<void> updateTask(String token, int taskId, String title, String description, String priority, DateTime? deadline) async {
     final response = await http.put(
       Uri.parse('$baseUrl/$taskId'),
       headers: {
@@ -79,6 +76,7 @@ class TaskService {
         "title": title,
         "description": description,
         "priority": priority,
+        "deadline": deadline?.toIso8601String(),
       }),
     );
 

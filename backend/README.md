@@ -11,6 +11,7 @@ docker-compose down
 docker system prune -a --volumes
 docker-compose up -d
 docker exec -it myfirstapp-db-1 psql -U devbrosrob -d app_comerciala  -c "SELECT * FROM users;"
+docker exec -it taskmanagerapp-db-1 psql -U devbrosrob -d taskmanager -c "DROP TABLE tasks;"
 
 Logger:
 from app.core.logger import logger

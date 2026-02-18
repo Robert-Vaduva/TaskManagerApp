@@ -33,6 +33,22 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  String _formatDate(DateTime? date) {
+    if (date == null) return "Fără termen";
+    return "${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}";
+  }
+
+  String _formatFullDate(DateTime? date) {
+    if (date == null) return "";
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final y = date.year;
+    final h = date.hour.toString().padLeft(2, '0');
+    final min = date.minute.toString().padLeft(2, '0');
+
+    return "$d.$m.$y la $h:$min";
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -46,9 +62,7 @@ class _DashboardPageState extends State<DashboardPage> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             onSelected: (String value) {
-              setState(() {
-                _sortBy = value;
-              });
+              setState(() => _sortBy = value);
             },
             itemBuilder: (BuildContext context) => [
               const PopupMenuItem(value: 'priority', child: Text('Sortează după Prioritate')),
@@ -60,20 +74,14 @@ class _DashboardPageState extends State<DashboardPage> {
           IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () async {
-              // Așteptăm rezultatul de la ProfilePage (noul email dacă se schimbă)
               final updatedEmail = await Navigator.push<String>(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProfilePage(
-                    email: widget.email,
-                    token: widget.token, // 1. TRIMITEM TOKEN-UL NECESAR API-ULUI
-                  ),
+                  builder: (context) => ProfilePage(email: widget.email, token: widget.token),
                 ),
               );
-
-              // 2. DACĂ USERUL ȘI-A SCHIMBAT EMAIL-UL, REÎMPROSPĂTĂM UI-UL
               if (updatedEmail != null && updatedEmail != widget.email) {
-                _refreshTasks(); // Opțional, dacă vrei să reîncarci totul
+                _refreshTasks();
               }
             },
           ),
@@ -90,44 +98,29 @@ class _DashboardPageState extends State<DashboardPage> {
 
           final allTasks = snapshot.data ?? [];
 
-          // 1. FILTRARE COMBINATĂ (Status + Căutare)
           final filteredTasks = allTasks.where((t) {
-            // Filtru de status
             bool matchesStatus = true;
             if (_selectedFilter == 'Active') matchesStatus = !t.isCompleted;
             if (_selectedFilter == 'Finalizate') matchesStatus = t.isCompleted;
 
-            // Filtru de căutare
             bool matchesSearch = t.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                                  (t.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
 
             return matchesStatus && matchesSearch;
           }).toList();
 
-          // 2. SORTARE AVANSATĂ
           filteredTasks.sort((a, b) {
-            // CRITERIUL 1: Task-urile nefinalizate apar mereu primele
-            if (a.isCompleted != b.isCompleted) {
-              return a.isCompleted ? 1 : -1;
-            }
+            if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
 
-            // CRITERIUL 2: Dacă au același status, sortăm după preferința utilizatorului (_sortBy)
             switch (_sortBy) {
               case 'priority':
-                // Mapăm prioritățile la valori numerice pentru comparare
                 const priorityWeights = {'high': 0, 'medium': 1, 'low': 2};
-                int weightA = priorityWeights[a.priority.toLowerCase()] ?? 1;
-                int weightB = priorityWeights[b.priority.toLowerCase()] ?? 1;
-                return weightA.compareTo(weightB);
-
+                return (priorityWeights[a.priority.toLowerCase()] ?? 1)
+                    .compareTo(priorityWeights[b.priority.toLowerCase()] ?? 1);
               case 'date':
-                // Sortăm după ID descrescător (presupunând că ID mai mare = task mai nou)
                 return b.id.compareTo(a.id);
-
               case 'alpha':
-                // Sortare alfabetică A-Z
                 return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-
               default:
                 return 0;
             }
@@ -137,20 +130,18 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               _buildHeader(isDarkMode),
               _buildStatsHeader(allTasks),
-              _buildFilterRow(), // Rândul de filtre
+              _buildFilterRow(),
               Expanded(
                 child: filteredTasks.isEmpty
                     ? const Center(child: Text("Niciun task găsit."))
                     : RefreshIndicator(
                         onRefresh: () async {
                           _refreshTasks();
-                          // Așteptăm un mic delay pentru a lăsa animația să fie vizibilă
                           await Future.delayed(const Duration(milliseconds: 500));
                         },
                         color: Colors.white,
                         backgroundColor: Colors.indigo,
                         child: ListView.builder(
-                          // Important: Physics-ul acesta permite pull-to-refresh chiar și când lista e scurtă
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.only(bottom: 80),
                           itemCount: filteredTasks.length,
@@ -178,7 +169,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // WIDGET FILTRE
   Widget _buildFilterRow() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -191,9 +181,7 @@ class _DashboardPageState extends State<DashboardPage> {
             child: ChoiceChip(
               label: Text(filter),
               selected: isSelected,
-              onSelected: (val) {
-                if (val) setState(() => _selectedFilter = filter);
-              },
+              onSelected: (val) { if (val) setState(() => _selectedFilter = filter); },
               selectedColor: Colors.indigo.shade100,
             ),
           );
@@ -202,11 +190,11 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // DIALOG EDITARE
   void _showEditTaskDialog(Task task) {
     final titleController = TextEditingController(text: task.title);
     final descController = TextEditingController(text: task.description);
     String selectedPriority = task.priority;
+    DateTime? selectedDeadline = task.deadline;
 
     showDialog(
       context: context,
@@ -221,11 +209,25 @@ class _DashboardPageState extends State<DashboardPage> {
                 TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<String>(
-                  initialValue: selectedPriority,
+                  value: selectedPriority.toLowerCase(),
                   decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
                   items: ['low', 'medium', 'high'].map((p) =>
                     DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
                   onChanged: (val) => setDialogState(() => selectedPriority = val!),
+                ),
+                const SizedBox(height: 15),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDeadline ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) setDialogState(() => selectedDeadline = picked);
+                  },
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(selectedDeadline == null ? "Adaugă Termen" : _formatDate(selectedDeadline)),
                 ),
               ],
             ),
@@ -235,11 +237,8 @@ class _DashboardPageState extends State<DashboardPage> {
             ElevatedButton(
               onPressed: () async {
                 await _taskService.updateTask(
-                  widget.token,
-                  task.id,
-                  titleController.text,
-                  descController.text,
-                  selectedPriority
+                  widget.token, task.id, titleController.text,
+                  descController.text, selectedPriority, selectedDeadline,
                 );
                 Navigator.pop(context);
                 _refreshTasks();
@@ -252,54 +251,203 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Reutilizăm widget-urile tale existente (Header, Stats, Card)
+  Widget _buildTaskCard(Task task) {
+    bool isExpired = task.deadline != null &&
+                     task.deadline!.isBefore(DateTime.now()) &&
+                     !task.isCompleted;
+
+    return Card(
+      elevation: 0.5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: GestureDetector(
+          onTap: () async {
+            bool newStatus = !task.isCompleted;
+            await _taskService.updateTaskStatus(widget.token, task.id, newStatus);
+            _refreshTasks();
+          },
+          child: Icon(
+            task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+            color: task.isCompleted ? Colors.green : _getPriorityColor(task.priority),
+            size: 32,
+          ),
+        ),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+            color: task.isCompleted
+                ? Colors.grey
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- DESCRIEREA TASK-ULUI ---
+            if (task.description != null && task.description!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Text(
+                  task.description!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    // Aici forțăm culoarea să fie albă sau adaptivă
+                    color: task.isCompleted
+                        ? Colors.grey
+                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+            const SizedBox(height: 4),
+            _buildPriorityChip(task.priority),
+
+            if (task.deadline != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.event, size: 14, color: isExpired ? Colors.red : Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatDate(task.deadline),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isExpired ? Colors.red : Colors.grey,
+                        fontWeight: isExpired ? FontWeight.bold : FontWeight.normal
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // --- INFORMAȚIE LAST UPDATE ---
+            if (task.updatedAt != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  "Actualizat: ${_formatFullDate(task.updatedAt)}",
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                ),
+              ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+          onPressed: () => _confirmDelete(task.id),
+        ),
+      ),
+    );
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high': return Colors.red;
+      case 'medium': return Colors.orange;
+      default: return Colors.blue;
+    }
+  }
+
+  Widget _buildPriorityChip(String priority) {
+    Color color = _getPriorityColor(priority);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      child: Text(priority.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  void _showAddTaskDialog() {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    String selectedPriority = 'medium';
+    DateTime? selectedDeadline;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Adaugă Task Nou"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: "Titlu")),
+                TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  value: selectedPriority,
+                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
+                  items: ['low', 'medium', 'high'].map((p) =>
+                    DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
+                  onChanged: (val) => setDialogState(() => selectedPriority = val!),
+                ),
+                const SizedBox(height: 15),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) setDialogState(() => selectedDeadline = picked);
+                  },
+                  icon: const Icon(Icons.calendar_month),
+                  label: Text(selectedDeadline == null ? "Setează Termen" : _formatDate(selectedDeadline)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleController.text.isNotEmpty) {
+                  await _taskService.createTask(
+                    widget.token, titleController.text, descController.text,
+                    selectedPriority, selectedDeadline,
+                  );
+                  Navigator.pop(context);
+                  _refreshTasks();
+                }
+              },
+              child: const Text("Adaugă"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGETS DE SUPORT (HEADER & STATS) ---
   Widget _buildHeader(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.indigo.withOpacity(0.2) : Colors.indigo.shade50,
-      ),
+      decoration: BoxDecoration(color: isDark ? Colors.indigo.withOpacity(0.2) : Colors.indigo.shade50),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Salut, ${widget.email.split('@')[0]}!",
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text("Salut, ${widget.email.split('@')[0]}!", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const Text("Gestionează-ți eficient timpul."),
-
-          // --- TEXT DINAMIC SORTARE ---
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(Icons.sort, size: 14, color: Colors.indigo.withOpacity(0.7)),
-              const SizedBox(width: 4),
-              Text(
-                "Sortat după: ${_sortBy == 'priority' ? 'Prioritate' : _sortBy == 'date' ? 'Cele mai noi' : 'Nume'}",
-                style: TextStyle(fontSize: 12, color: Colors.indigo.withOpacity(0.7)),
-              ),
-            ],
-          ),
-          // ----------------------------
-
           const SizedBox(height: 15),
-
-          // BARA DE CĂUTARE
           TextField(
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
+            onChanged: (val) => setState(() => _searchQuery = val),
             decoration: InputDecoration(
               hintText: "Caută un task...",
               prefixIcon: const Icon(Icons.search, color: Colors.indigo),
               filled: true,
               fillColor: isDark ? Colors.black26 : Colors.white,
-              contentPadding: const EdgeInsets.symmetric(vertical: 0),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: EdgeInsets.zero,
             ),
           ),
         ],
@@ -340,75 +488,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildTaskCard(Task task) {
-    return Card(
-      elevation: 0.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ListTile(
-        leading: GestureDetector(
-          onTap: () async {
-            try {
-              // Trimitem valoarea opusă celei actuale
-              bool newStatus = !task.isCompleted;
-              await _taskService.updateTaskStatus(widget.token, task.id, newStatus);
-
-              // Forțăm reîmprospătarea listei după ce primim confirmarea de la server
-              _refreshTasks();
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(newStatus ? "Task finalizat!" : "Task redeschis"),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Eroare server: $e")),
-              );
-            }
-          },
-          child: Icon(
-            task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: task.isCompleted ? Colors.green : _getPriorityColor(task.priority),
-            size: 30,
-          ),
-        ),
-        title: Text(
-          task.title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-            color: task.isCompleted ? Colors.grey : null,
-          ),
-        ),
-        subtitle: _buildPriorityChip(task.priority),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-          onPressed: () => _confirmDelete(task.id),
-        ),
-      ),
-    );
-  }
-
-  Color _getPriorityColor(String priority) {
-    switch (priority.toLowerCase()) {
-      case 'high': return Colors.red;
-      case 'medium': return Colors.orange;
-      default: return Colors.blue;
-    }
-  }
-
-  Widget _buildPriorityChip(String priority) {
-    Color color = _getPriorityColor(priority);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      margin: const EdgeInsets.only(top: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-      child: Text(priority.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-    );
-  }
-
   void _confirmDelete(int taskId) {
     showDialog(
       context: context,
@@ -426,49 +505,6 @@ class _DashboardPageState extends State<DashboardPage> {
             child: const Text("Șterge", style: TextStyle(color: Colors.white)),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showAddTaskDialog() {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    String selectedPriority = 'medium';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Adaugă Task Nou"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: titleController, decoration: const InputDecoration(labelText: "Titlu")),
-              TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
-              const SizedBox(height: 15),
-              DropdownButtonFormField<String>(
-                initialValue: selectedPriority,
-                decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
-                items: ['low', 'medium', 'high'].map((p) =>
-                  DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
-                onChanged: (val) => setDialogState(() => selectedPriority = val!),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
-            ElevatedButton(
-              onPressed: () async {
-                if (titleController.text.isNotEmpty) {
-                  await _taskService.createTask(widget.token, titleController.text, descController.text, selectedPriority);
-                  Navigator.pop(context);
-                  _refreshTasks();
-                }
-              },
-              child: const Text("Adaugă"),
-            ),
-          ],
-        ),
       ),
     );
   }

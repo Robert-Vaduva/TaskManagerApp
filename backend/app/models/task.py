@@ -19,7 +19,10 @@ class Task(Base):
     description = Column(String)
     priority = Column(Enum(TaskPriority), default=TaskPriority.MEDIUM)
     is_completed = Column(Boolean, default=False)
+    deadline = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="tasks")
