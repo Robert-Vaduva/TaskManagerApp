@@ -6,6 +6,7 @@ class Task {
   final bool isCompleted;
   final DateTime? deadline;
   final DateTime? updatedAt;
+  final String category;
 
   Task({
     required this.id,
@@ -15,6 +16,7 @@ class Task {
     required this.isCompleted,
     this.deadline,
     this.updatedAt,
+    this.category="General"
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Task {
       title: json['title'],
       description: json['description'],
       priority: json['priority'],
+      category: json['category'] ?? 'General',
       isCompleted: json['is_completed'] ?? false,
       deadline: json['deadline'] != null
           ? DateTime.parse(json['deadline'])
@@ -31,5 +34,17 @@ class Task {
           ? DateTime.parse(json['updated_at'])
           : null,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (id != null) 'id': id,
+      'title': title,
+      'description': description,
+      'priority': priority,
+      'is_completed': isCompleted,
+      'category': category,
+      'deadline': deadline?.toIso8601String(),
+    };
   }
 }

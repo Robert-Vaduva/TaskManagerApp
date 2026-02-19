@@ -18,6 +18,7 @@ class Task(Base):
     title = Column(String, nullable=False)
     description = Column(String)
     priority = Column(Enum(TaskPriority), default=TaskPriority.MEDIUM)
+    category = Column(String, nullable=True, default="General")
     is_completed = Column(Boolean, default=False)
     deadline = Column(DateTime, nullable=True)
 

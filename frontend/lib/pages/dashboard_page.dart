@@ -22,6 +22,7 @@ class _DashboardPageState extends State<DashboardPage> {
   String _selectedFilter = 'Toate';
   String _searchQuery = "";
   String _sortBy = 'priority';
+  final List<String> _categories = ["General", "Muncă", "Personal", "Urgent", "Hobby"];
 
   @override
   void initState() {
@@ -47,8 +48,25 @@ class _DashboardPageState extends State<DashboardPage> {
     final y = date.year;
     final h = date.hour.toString().padLeft(2, '0');
     final min = date.minute.toString().padLeft(2, '0');
-
     return "$d.$m.$y la $h:$min";
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high': return Colors.red;
+      case 'medium': return Colors.orange;
+      default: return Colors.blue;
+    }
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'muncă': return Colors.blue;
+      case 'personal': return Colors.green;
+      case 'urgent': return Colors.red;
+      case 'hobby': return Colors.orange;
+      default: return Colors.blueGrey;
+    }
   }
 
   @override
@@ -63,10 +81,8 @@ class _DashboardPageState extends State<DashboardPage> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
-            onSelected: (String value) {
-              setState(() => _sortBy = value);
-            },
-            itemBuilder: (BuildContext context) => [
+            onSelected: (String value) => setState(() => _sortBy = value),
+            itemBuilder: (context) => [
               const PopupMenuItem(value: 'priority', child: Text('Sortează după Prioritate')),
               const PopupMenuItem(value: 'date', child: Text('Sortează după cele mai noi')),
               const PopupMenuItem(value: 'alpha', child: Text('Sortează Alfabetic')),
@@ -78,13 +94,9 @@ class _DashboardPageState extends State<DashboardPage> {
             onPressed: () async {
               final updatedEmail = await Navigator.push<String>(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => ProfilePage(email: widget.email, token: widget.token),
-                ),
+                MaterialPageRoute(builder: (context) => ProfilePage(email: widget.email, token: widget.token)),
               );
-              if (updatedEmail != null && updatedEmail != widget.email) {
-                _refreshTasks();
-              }
+              if (updatedEmail != null) _refreshTasks();
             },
           ),
         ],
@@ -92,39 +104,26 @@ class _DashboardPageState extends State<DashboardPage> {
       body: FutureBuilder<List<Task>>(
         future: _tasksFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Eroare: ${snapshot.error}"));
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (snapshot.hasError) return Center(child: Text("Eroare: ${snapshot.error}"));
 
           final allTasks = snapshot.data ?? [];
-
           final filteredTasks = allTasks.where((t) {
-            bool matchesStatus = true;
-            if (_selectedFilter == 'Active') matchesStatus = !t.isCompleted;
-            if (_selectedFilter == 'Finalizate') matchesStatus = t.isCompleted;
-
+            bool matchesStatus = _selectedFilter == 'Toate' || (_selectedFilter == 'Active' ? !t.isCompleted : t.isCompleted);
             bool matchesSearch = t.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                                  (t.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
-
             return matchesStatus && matchesSearch;
           }).toList();
 
           filteredTasks.sort((a, b) {
             if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
-
             switch (_sortBy) {
               case 'priority':
-                const priorityWeights = {'high': 0, 'medium': 1, 'low': 2};
-                return (priorityWeights[a.priority.toLowerCase()] ?? 1)
-                    .compareTo(priorityWeights[b.priority.toLowerCase()] ?? 1);
-              case 'date':
-                return b.id.compareTo(a.id);
-              case 'alpha':
-                return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-              default:
-                return 0;
+                const weights = {'high': 0, 'medium': 1, 'low': 2};
+                return (weights[a.priority.toLowerCase()] ?? 1).compareTo(weights[b.priority.toLowerCase()] ?? 1);
+              case 'date': return b.id!.compareTo(a.id!);
+              case 'alpha': return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+              default: return 0;
             }
           });
 
@@ -137,14 +136,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: filteredTasks.isEmpty
                     ? const Center(child: Text("Niciun task găsit."))
                     : RefreshIndicator(
-                        onRefresh: () async {
-                          _refreshTasks();
-                          await Future.delayed(const Duration(milliseconds: 500));
-                        },
-                        color: Colors.white,
-                        backgroundColor: Colors.indigo,
+                        onRefresh: () async => _refreshTasks(),
                         child: ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.only(bottom: 80),
                           itemCount: filteredTasks.length,
                           itemBuilder: (context, index) {
@@ -164,30 +157,149 @@ class _DashboardPageState extends State<DashboardPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddTaskDialog,
         backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text("Task Nou"),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text("Task Nou", style: TextStyle(color: Colors.white)),
       ),
     );
   }
 
-  Widget _buildFilterRow() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: ['Toate', 'Active', 'Finalizate'].map((filter) {
-          bool isSelected = _selectedFilter == filter;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(filter),
-              selected: isSelected,
-              onSelected: (val) { if (val) setState(() => _selectedFilter = filter); },
-              selectedColor: Colors.indigo.shade100,
+  Widget _buildTaskCard(Task task) {
+    bool isExpired = task.deadline != null && task.deadline!.isBefore(DateTime.now()) && !task.isCompleted;
+
+    return Card(
+      elevation: 0.5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(12),
+        leading: IconButton(
+          icon: Icon(
+            task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+            color: task.isCompleted ? Colors.green : _getPriorityColor(task.priority),
+            size: 30,
+          ),
+          onPressed: () async {
+            await _taskService.updateTaskStatus(widget.token, task.id!, !task.isCompleted);
+            _refreshTasks();
+          },
+        ),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (task.description != null && task.description!.isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 4), child: Text(task.description!)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _buildPriorityChip(task.priority),
+                _buildCategoryChip(task.category),
+              ],
             ),
-          );
-        }).toList(),
+            if (task.deadline != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time, size: 14, color: isExpired ? Colors.red : Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(_formatDate(task.deadline), style: TextStyle(color: isExpired ? Colors.red : Colors.grey, fontSize: 12)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+          onPressed: () => _confirmDelete(task.id!),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriorityChip(String priority) {
+    Color color = _getPriorityColor(priority);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+      child: Text(priority.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildCategoryChip(String category) {
+    Color color = _getCategoryColor(category);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: color.withOpacity(0.2))),
+      child: Text(category, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  void _showAddTaskDialog() {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    String priority = 'medium';
+    String category = 'General';
+    DateTime? deadline;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Task Nou"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: "Titlu")),
+                TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  decoration: const InputDecoration(labelText: "Categorie", border: OutlineInputBorder()),
+                  items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (val) => setDialogState(() => category = val!),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: priority,
+                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
+                  items: ['low', 'medium', 'high'].map((p) => DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
+                  onChanged: (val) => setDialogState(() => priority = val!),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    final picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime(2100));
+                    if (picked != null) setDialogState(() => deadline = picked);
+                  },
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(deadline == null ? "Setează Termen" : _formatDate(deadline)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleController.text.isNotEmpty) {
+                  final t = await _taskService.createTask(widget.token, titleController.text, descController.text, priority, category, deadline);
+                  if (deadline != null) await _notificationService.scheduleNotification(t.id!, "Deadline!", "Task: ${t.title}", deadline!);
+                  Navigator.pop(context);
+                  _refreshTasks();
+                }
+              },
+              child: const Text("Adaugă"),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -195,8 +307,9 @@ class _DashboardPageState extends State<DashboardPage> {
   void _showEditTaskDialog(Task task) {
     final titleController = TextEditingController(text: task.title);
     final descController = TextEditingController(text: task.description);
-    String selectedPriority = task.priority;
-    DateTime? selectedDeadline = task.deadline;
+    String priority = task.priority;
+    String category = task.category;
+    DateTime? deadline = task.deadline;
 
     showDialog(
       context: context,
@@ -211,25 +324,25 @@ class _DashboardPageState extends State<DashboardPage> {
                 TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<String>(
-                  initialValue: selectedPriority.toLowerCase(),
-                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
-                  items: ['low', 'medium', 'high'].map((p) =>
-                    DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
-                  onChanged: (val) => setDialogState(() => selectedPriority = val!),
+                  value: category,
+                  decoration: const InputDecoration(labelText: "Categorie", border: OutlineInputBorder()),
+                  items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (val) => setDialogState(() => category = val!),
                 ),
-                const SizedBox(height: 15),
-                OutlinedButton.icon(
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: priority,
+                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
+                  items: ['low', 'medium', 'high'].map((p) => DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
+                  onChanged: (val) => setDialogState(() => priority = val!),
+                ),
+                TextButton.icon(
                   onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDeadline ?? DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) setDialogState(() => selectedDeadline = picked);
+                    final picked = await showDatePicker(context: context, initialDate: deadline ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2100));
+                    if (picked != null) setDialogState(() => deadline = picked);
                   },
                   icon: const Icon(Icons.calendar_today),
-                  label: Text(selectedDeadline == null ? "Adaugă Termen" : _formatDate(selectedDeadline)),
+                  label: Text(_formatDate(deadline)),
                 ),
               ],
             ),
@@ -238,21 +351,7 @@ class _DashboardPageState extends State<DashboardPage> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
             ElevatedButton(
               onPressed: () async {
-                await _taskService.updateTask(
-                  widget.token, task.id, titleController.text,
-                  descController.text, selectedPriority, selectedDeadline,
-                );
-
-                // --- PROGRAMARE NOTIFICARE LA EDITARE ---
-                if (selectedDeadline != null) {
-                  await _notificationService.scheduleNotification(
-                    task.id,
-                    "Task actualizat!",
-                    "Termenul pentru '${titleController.text}' este acum.",
-                    selectedDeadline!,
-                  );
-                }
-
+                await _taskService.updateTask(widget.token, task.id!, titleController.text, descController.text, priority, category, deadline);
                 Navigator.pop(context);
                 _refreshTasks();
               },
@@ -264,210 +363,24 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildTaskCard(Task task) {
-    bool isExpired = task.deadline != null &&
-                     task.deadline!.isBefore(DateTime.now()) &&
-                     !task.isCompleted;
-
-    return Card(
-      elevation: 0.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: GestureDetector(
-          onTap: () async {
-            bool newStatus = !task.isCompleted;
-            await _taskService.updateTaskStatus(widget.token, task.id, newStatus);
-            _refreshTasks();
-          },
-          child: Icon(
-            task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: task.isCompleted ? Colors.green : _getPriorityColor(task.priority),
-            size: 32,
-          ),
-        ),
-        title: Text(
-          task.title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-            color: task.isCompleted
-                ? Colors.grey
-                : Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (task.description != null && task.description!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Text(
-                  task.description!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: task.isCompleted
-                        ? Colors.grey
-                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-
-            const SizedBox(height: 4),
-            _buildPriorityChip(task.priority),
-
-            if (task.deadline != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.event, size: 14, color: isExpired ? Colors.red : Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatDate(task.deadline),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isExpired ? Colors.red : Colors.grey,
-                        fontWeight: isExpired ? FontWeight.bold : FontWeight.normal
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            if (task.updatedAt != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  "Actualizat: ${_formatFullDate(task.updatedAt)}",
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
-                ),
-              ),
-          ],
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-          onPressed: () => _confirmDelete(task.id),
-        ),
-      ),
-    );
-  }
-
-  Color _getPriorityColor(String priority) {
-    switch (priority.toLowerCase()) {
-      case 'high': return Colors.red;
-      case 'medium': return Colors.orange;
-      default: return Colors.blue;
-    }
-  }
-
-  Widget _buildPriorityChip(String priority) {
-    Color color = _getPriorityColor(priority);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-      child: Text(priority.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  void _showAddTaskDialog() {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    String selectedPriority = 'medium';
-    DateTime? selectedDeadline;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Adaugă Task Nou"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: titleController, decoration: const InputDecoration(labelText: "Titlu")),
-                TextField(controller: descController, decoration: const InputDecoration(labelText: "Descriere")),
-                const SizedBox(height: 15),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedPriority,
-                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
-                  items: ['low', 'medium', 'high'].map((p) =>
-                    DropdownMenuItem(value: p, child: Text(p.toUpperCase()))).toList(),
-                  onChanged: (val) => setDialogState(() => selectedPriority = val!),
-                ),
-                const SizedBox(height: 15),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) setDialogState(() => selectedDeadline = picked);
-                  },
-                  icon: const Icon(Icons.calendar_month),
-                  label: Text(selectedDeadline == null ? "Setează Termen" : _formatDate(selectedDeadline)),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
-            ElevatedButton(
-              onPressed: () async {
-                if (titleController.text.isNotEmpty) {
-                  final newTask = await _taskService.createTask(
-                    widget.token, titleController.text, descController.text,
-                    selectedPriority, selectedDeadline,
-                  );
-
-                  // --- PROGRAMARE NOTIFICARE LA CREARE ---
-                  if (selectedDeadline != null) {
-                    await _notificationService.scheduleNotification(
-                      newTask.id,
-                      "Deadline Task!",
-                      "Task-ul '${newTask.title}' a ajuns la termen.",
-                      selectedDeadline!,
-                    );
-                  }
-
-                  Navigator.pop(context);
-                  _refreshTasks();
-                }
-              },
-              child: const Text("Adaugă"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeader(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
-      width: double.infinity,
-      decoration: BoxDecoration(color: isDark ? Colors.indigo.withOpacity(0.2) : Colors.indigo.shade50),
+      color: isDark ? Colors.indigo.withOpacity(0.1) : Colors.indigo.shade50,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text("Salut, ${widget.email.split('@')[0]}!", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const Text("Gestionează-ți eficient timpul."),
-          const SizedBox(height: 15),
+          const Text("Iată ce ai de făcut astăzi:"),
+          const SizedBox(height: 12),
           TextField(
             onChanged: (val) => setState(() => _searchQuery = val),
             decoration: InputDecoration(
-              hintText: "Caută un task...",
-              prefixIcon: const Icon(Icons.search, color: Colors.indigo),
+              hintText: "Caută task-uri...",
+              prefixIcon: const Icon(Icons.search),
               filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.white,
+              fillColor: isDark ? Colors.white10 : Colors.white,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              contentPadding: EdgeInsets.zero,
             ),
           ),
         ],
@@ -478,12 +391,12 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildStatsHeader(List<Task> tasks) {
     int completed = tasks.where((t) => t.isCompleted).length;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          _statCard("Total", tasks.length.toString(), Colors.blue),
+          _statCard("Total", "${tasks.length}", Colors.blue),
           const SizedBox(width: 12),
-          _statCard("Gata", completed.toString(), Colors.green),
+          _statCard("Finalizate", "$completed", Colors.green),
         ],
       ),
     );
@@ -493,17 +406,28 @@ class _DashboardPageState extends State<DashboardPage> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            Text(label, style: TextStyle(color: color.withOpacity(0.8), fontSize: 12)),
-          ],
-        ),
+        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+        child: Column(children: [
+          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: TextStyle(color: color, fontSize: 12)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildFilterRow() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: ['Toate', 'Active', 'Finalizate'].map((f) => Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ChoiceChip(
+            label: Text(f),
+            selected: _selectedFilter == f,
+            onSelected: (s) => setState(() => _selectedFilter = f),
+          ),
+        )).toList(),
       ),
     );
   }
@@ -512,18 +436,14 @@ class _DashboardPageState extends State<DashboardPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Ștergi task-ul?"),
+        title: const Text("Ștergi acest task?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Nu")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              await _taskService.deleteTask(widget.token, taskId);
-              Navigator.pop(context);
-              _refreshTasks();
-            },
-            child: const Text("Șterge", style: TextStyle(color: Colors.white)),
-          ),
+          TextButton(onPressed: () async {
+            await _taskService.deleteTask(widget.token, taskId);
+            Navigator.pop(context);
+            _refreshTasks();
+          }, child: const Text("Da, șterge", style: TextStyle(color: Colors.red))),
         ],
       ),
     );
