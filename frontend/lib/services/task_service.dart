@@ -3,8 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/task_model.dart';
 
 class TaskService {
-  //rova final String baseUrl = "http://127.0.0.1:8000/tasks";
-  final String baseUrl = "http://192.168.178.112:8000/tasks";
+  final String baseUrl = "http://127.0.0.1:8000/tasks";
 
   Future<List<Task>> getTasks(String token) async {
     final response = await http.get(

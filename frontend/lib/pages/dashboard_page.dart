@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/task_model.dart';
 import '../services/task_service.dart';
-import '../services/notification_service.dart'; // IMPORT NOU
+import '../services/notification_service.dart';
 import 'profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -16,7 +16,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   final TaskService _taskService = TaskService();
-  final NotificationService _notificationService = NotificationService(); // INSTANȚĂ NOUĂ
+  final NotificationService _notificationService = NotificationService();
   late Future<List<Task>> _tasksFuture;
 
   String _selectedFilter = 'Toate';
@@ -85,16 +85,6 @@ class _DashboardPageState extends State<DashboardPage> {
               if (updatedEmail != null && updatedEmail != widget.email) {
                 _refreshTasks();
               }
-            },
-          ),
-          IconButton(//rova remove this button
-            icon: const Icon(Icons.notifications_active),
-            onPressed: () async {
-              print("Testare notificare imediată...");
-              await _notificationService.showInstantNotification(
-                "Salut!",
-                "Dacă vezi asta, notificările merg pe Simulator!"
-              );
             },
           ),
         ],
@@ -259,7 +249,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     task.id,
                     "Task actualizat!",
                     "Termenul pentru '${titleController.text}' este acum.",
-                    selectedDeadline!, // <--- Și aici punem !
+                    selectedDeadline!,
                   );
                 }
 
@@ -431,7 +421,6 @@ class _DashboardPageState extends State<DashboardPage> {
             ElevatedButton(
               onPressed: () async {
                 if (titleController.text.isNotEmpty) {
-                  // Capturăm obiectul Task creat pentru a-i lua ID-ul
                   final newTask = await _taskService.createTask(
                     widget.token, titleController.text, descController.text,
                     selectedPriority, selectedDeadline,
@@ -443,7 +432,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       newTask.id,
                       "Deadline Task!",
                       "Task-ul '${newTask.title}' a ajuns la termen.",
-                      selectedDeadline!, // <--- Aici punem !
+                      selectedDeadline!,
                     );
                   }
 

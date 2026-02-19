@@ -13,8 +13,7 @@ app = FastAPI(title="TaskManager API")
 
 app.add_middleware(
     CORSMiddleware,
-    #rova allow_origins=settings.ALLOWED_ORIGINS,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

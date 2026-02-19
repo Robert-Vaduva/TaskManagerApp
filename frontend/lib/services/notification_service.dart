@@ -11,25 +11,31 @@ class NotificationService {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const DarwinInitializationSettings initializationSettingsIOS =
+    const DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
-      notificationCategories: [],
     );
 
     const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsDarwin,
+      );
 
-    await _notificationsPlugin.initialize(settings: initializationSettings);
-    await _notificationsPlugin.initialize(settings: initializationSettings,
-      onDidReceiveNotificationResponse: (details) {
-        // Ce se întâmplă când dai click pe notificare
-      },
-    );
+      await _notificationsPlugin.initialize(
+        settings: initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse details) {
+          print("Notificare apăsată: ${details.payload}");
+        },
+      );
+      await _notificationsPlugin
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
   }
 
   Future<void> showInstantNotification(String title, String body) async {
@@ -48,7 +54,7 @@ class NotificationService {
 
     const NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
-      iOS: iosDetails, // Trece detaliile aici
+      iOS: iosDetails,
     );
 
     await _notificationsPlugin.show(id: 0, title: title, body: body, notificationDetails: platformDetails);
@@ -71,7 +77,6 @@ class NotificationService {
           priority: Priority.high,
         ),
       ),
-      // Eliminăm uiLocalNotificationDateInterpretation deoarece nu mai există în v17+
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   }

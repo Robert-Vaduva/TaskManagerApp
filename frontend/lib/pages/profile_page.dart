@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/user_service.dart'; // Asigură-te că importul este corect
+import '../services/user_service.dart';
 import 'auth_page.dart';
 
 class ProfilePage extends StatefulWidget {
   final String email;
-  final String token; // 1. Adăugat token pentru API
+  final String token;
 
   const ProfilePage({super.key, required this.email, required this.token});
 
@@ -13,13 +13,12 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // 2. Instanțiem serviciul
   final UserService _userService = UserService();
 
   late TextEditingController _emailController;
   late TextEditingController _nameController;
   bool _isEditing = false;
-  bool _isLoading = false; // Pentru feedback vizual la salvare
+  bool _isLoading = false;
 
   final String _lastLogin = "${DateTime.now().day}.${DateTime.now().month}.${DateTime.now().year} ${DateTime.now().hour}:${DateTime.now().minute}";
 
@@ -27,8 +26,8 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: widget.email);
-    _nameController = TextEditingController(text: ""); // Începem cu gol
-    _loadUserData(); // Chemăm funcția de încărcare
+    _nameController = TextEditingController(text: "");
+    _loadUserData();
   }
 
   Future<void> _loadUserData() async {
@@ -37,7 +36,6 @@ class _ProfilePageState extends State<ProfilePage> {
     if (data != null) {
       setState(() {
         _emailController.text = data['email'] ?? widget.email;
-        // Dacă full_name e null în DB, punem email-ul ca backup
         _nameController.text = data['full_name'] ?? widget.email.split('@')[0];
         _isLoading = false;
       });
@@ -51,7 +49,6 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
-  // 3. Metodă unificată pentru toggle și salvare
   void _toggleEdit() async {
     if (_isEditing) {
       await _saveProfile();
@@ -64,7 +61,7 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isLoading = true);
 
     final result = await _userService.updateProfile(
-      widget.token, // Folosim widget.token din clasa părinte
+      widget.token,
       _emailController.text,
       _nameController.text,
     );
@@ -135,7 +132,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 backgroundColor: Colors.white,
                 child: CircleAvatar(
                   radius: 56,
-                  // Folosim numele pentru a genera un avatar dinamic
                   backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=${_nameController.text}&background=random'),
                 ),
               ),

@@ -26,25 +26,22 @@ class _AuthPageState extends State<AuthPage> {
     });
 
     // Ajustează URL-ul: 10.0.2.2 pentru emulator Android, 127.0.0.1 pentru Web/Desktop
-    //rova final String baseUrl = "http://127.0.0.1:8000/api/v1/auth";
-    final String baseUrl = "http://192.168.178.112:8000/api/v1/auth";
+    final String baseUrl = "http://127.0.0.1:8000/api/v1/auth";
     final url = Uri.parse(isLogin ? '$baseUrl/login' : '$baseUrl/register');
 
     try {
       http.Response response;
 
       if (isLogin) {
-        // LOGIN: Trebuie să trimitem Form Data (x-www-form-urlencoded)
         response = await http.post(
           url,
           headers: {"Content-Type": "application/x-www-form-urlencoded"},
           body: {
-            "username": _emailController.text, // FastAPI caută 'username'
+            "username": _emailController.text,
             "password": _passController.text,
           },
         );
       } else {
-        // REGISTER: Trimitem JSON standard
         response = await http.post(
           url,
           headers: {"Content-Type": "application/json"},
@@ -61,7 +58,6 @@ class _AuthPageState extends State<AuthPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (isLogin) {
           String token = data['access_token'];
-          // Navigăm și ștergem istoricul pentru a nu reveni la login cu butonul 'back'
           if (mounted) {
             Navigator.pushReplacement(
               context,
@@ -80,7 +76,6 @@ class _AuthPageState extends State<AuthPage> {
           });
         }
       } else {
-        // Gestionare erori de la backend
         String error = data['detail'] is String ? data['detail'] : "Eroare validare date";
         setState(() => _message = error);
       }

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class UserService {
-  final String baseUrl = "http://127.0.0.1:8000/users"; // Ajustează IP-ul pentru platforma ta
+  final String baseUrl = "http://127.0.0.1:8000/users";
 
   Future<Map<String, dynamic>?> updateProfile(String token, String email, String fullName) async {
     try {
