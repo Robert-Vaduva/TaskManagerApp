@@ -14,7 +14,6 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final UserService _userService = UserService();
-
   late TextEditingController _emailController;
   late TextEditingController _nameController;
   bool _isEditing = false;
@@ -59,115 +58,101 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveProfile() async {
     setState(() => _isLoading = true);
-
-    final result = await _userService.updateProfile(
-      widget.token,
-      _emailController.text,
-      _nameController.text,
-    );
-
+    final result = await _userService.updateProfile(widget.token, _emailController.text, _nameController.text);
     setState(() => _isLoading = false);
 
     if (result != null) {
-      _showSnackBar("Profil actualizat cu succes!");
+      _showSnackBar("Profil actualizat!");
       setState(() => _isEditing = false);
     } else {
-      _showSnackBar("Eroare la salvare. Verificați datele sau conexiunea.");
+      _showSnackBar("Eroare la salvare.");
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    // Calculăm o margine adaptivă: 10% din ecran, dar nu mai puțin de 16px
+    double horizontalPadding = screenWidth * 0.10;
+    if (horizontalPadding < 16) horizontalPadding = 16;
+
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text("Profilul Meu"),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
         actions: [
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(12.0),
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-            )
-          else
-            IconButton(
-              icon: Icon(_isEditing ? Icons.check : Icons.edit),
-              onPressed: _toggleEdit,
-            ),
+          IconButton(
+            icon: Icon(_isEditing ? Icons.check : Icons.edit),
+            onPressed: _toggleEdit,
+          ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildProfileHeader(),
-            const SizedBox(height: 20),
-            _buildPersonalDetails(),
-            const SizedBox(height: 20),
-            _buildSystemInfo(),
-            const SizedBox(height: 30),
-            _buildLogoutButton(),
-          ],
+      body: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Column(
+              children: [
+                _buildProfileHeader(theme),
+                const SizedBox(height: 30),
+                _buildPersonalDetails(theme),
+                const SizedBox(height: 25),
+                _buildSystemInfo(theme),
+                const SizedBox(height: 40),
+                _buildLogoutButton(),
+                const SizedBox(height: 30),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(ThemeData theme) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 30),
-      decoration: const BoxDecoration(
-        color: Colors.indigo,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer, // Culoare mai discretă pentru header-ul încapsulat
+        borderRadius: BorderRadius.circular(30),
       ),
       child: Column(
         children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.white,
-                child: CircleAvatar(
-                  radius: 56,
-                  backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=${_nameController.text}&background=random'),
-                ),
-              ),
-              if (_isEditing)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.orange,
-                    radius: 18,
-                    child: IconButton(
-                      icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
-                      onPressed: () => _showSnackBar("Funcție upload imagine indisponibilă momentan"),
-                    ),
-                  ),
-                ),
-            ],
+          CircleAvatar(
+            radius: 65,
+            backgroundColor: theme.colorScheme.primary,
+            child: CircleAvatar(
+              radius: 60,
+              backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=${_nameController.text}&background=random'),
+            ),
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 20),
           if (!_isEditing)
             Text(
               _nameController.text,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onPrimaryContainer
+              ),
             )
           else
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 50),
+              padding: const EdgeInsets.symmetric(horizontal: 40),
               child: TextField(
                 controller: _nameController,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 20),
-                decoration: const InputDecoration(
+                style: TextStyle(fontSize: 22, color: theme.colorScheme.onPrimaryContainer),
+                decoration: InputDecoration(
                   hintText: "Nume Complet",
-                  hintStyle: TextStyle(color: Colors.white54),
-                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.colorScheme.primary.withOpacity(0.5))),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.colorScheme.primary)),
                 ),
               ),
             ),
@@ -176,31 +161,29 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildPersonalDetails() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("DETALII PERSONALE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-          const SizedBox(height: 10),
-          _buildEditableField(Icons.email_outlined, "Email", _emailController),
-        ],
-      ),
+  Widget _buildPersonalDetails(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("DETALII PERSONALE",
+             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary, letterSpacing: 1.2)),
+        const SizedBox(height: 15),
+        _buildEditableField(theme, Icons.email_outlined, "Email", _emailController),
+      ],
     );
   }
 
-  Widget _buildEditableField(IconData icon, String label, TextEditingController controller) {
+  Widget _buildEditableField(ThemeData theme, IconData icon, String label, TextEditingController controller) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(15),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.indigo),
-          const SizedBox(width: 15),
+          Icon(icon, color: theme.colorScheme.primary),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,7 +193,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   controller: controller,
                   enabled: _isEditing,
                   decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ],
             ),
@@ -220,42 +203,42 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildSystemInfo() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("SECURITATE & SISTEM", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-          const SizedBox(height: 10),
-          _buildStaticInfo(Icons.history, "Ultimul login", _lastLogin),
-          const SizedBox(height: 10),
-          _buildStaticInfo(Icons.security, "Tip Cont", "Utilizator Verificat"),
-        ],
+  Widget _buildSystemInfo(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("SECURITATE & SISTEM",
+             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary, letterSpacing: 1.2)),
+        const SizedBox(height: 15),
+        _buildStaticInfo(theme, Icons.history, "Ultimul login", _lastLogin),
+        const SizedBox(height: 10),
+        _buildStaticInfo(theme, Icons.security, "Tip Cont", "Utilizator Verificat"),
+      ],
+    );
+  }
+
+  Widget _buildStaticInfo(ThemeData theme, IconData icon, String label, String value) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.15),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        leading: Icon(icon, color: theme.colorScheme.secondary),
+        title: Text(label, style: const TextStyle(fontSize: 14)),
+        trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
       ),
     );
   }
 
-  Widget _buildStaticInfo(IconData icon, String label, String value) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.indigo.shade300),
-      title: Text(label, style: const TextStyle(fontSize: 13)),
-      trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
-    );
-  }
-
   Widget _buildLogoutButton() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: OutlinedButton.icon(
-        onPressed: _confirmLogout,
-        icon: const Icon(Icons.logout, color: Colors.red),
-        label: const Text("DECONECTARE", style: TextStyle(color: Colors.red)),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 50),
-          side: const BorderSide(color: Colors.red),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+    return OutlinedButton.icon(
+      onPressed: _confirmLogout,
+      icon: const Icon(Icons.logout, color: Colors.red),
+      label: const Text("DECONECTARE", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 55),
+        side: const BorderSide(color: Colors.red, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -264,14 +247,15 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Ieșire cont"),
-        content: const Text("Ești sigur că vrei să te deconectezi?"),
+        title: const Text("Deconectare"),
+        content: const Text("Ești sigur că vrei să părăsești contul?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () => Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (context) => const AuthPage()), (route) => false),
-            child: const Text("Deconectare", style: TextStyle(color: Colors.red)),
+            child: const Text("Deconectare"),
           ),
         ],
       ),
@@ -279,6 +263,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
   }
 }

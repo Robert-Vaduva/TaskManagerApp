@@ -45,3 +45,6 @@ change in frontend/lib/pages/auth_page.dart →  final String baseUrl = "http://
 change in frontend/lib/services/task_services.dart →    final String baseUrl = "http://192.168.178.112:8000/tasks";
 start the frontend from command line:
 flutter run and select your device from the list
+
+### 6. Animations done with LottieFiles
+https://lottiefiles.com/
