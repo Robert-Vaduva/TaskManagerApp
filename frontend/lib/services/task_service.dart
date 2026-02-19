@@ -66,7 +66,7 @@ class TaskService {
   }
 
   Future<void> updateTask(String token, int taskId, String title, String description, String priority, DateTime? deadline) async {
-    final response = await http.put(
+    final response = await http.patch(
       Uri.parse('$baseUrl/$taskId'),
       headers: {
         "Authorization": "Bearer $token",

@@ -1,12 +1,9 @@
 from fastapi import FastAPI
 
-from app import database
-from app.database import Base
 from app.api import auth
 from app.api.endpoints import user, task
 from app.core.config import settings
 
-Base.metadata.create_all(bind=database.engine)
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="TaskManager API")
