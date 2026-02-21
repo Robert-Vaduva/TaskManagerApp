@@ -46,6 +46,13 @@
        <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
 
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Avem nevoie de acces la galeria foto pentru a-ți putea schimba imaginea de profil.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Avem nevoie de acces la cameră pentru a-ți putea face o poză de profil.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Avem nevoie de acces la microfon.</string>
+
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

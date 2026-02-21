@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/user_service.dart';
+import '../models/user_model.dart'; // Asigură-te că ai acest import
 import 'auth_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -14,30 +17,55 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final UserService _userService = UserService();
+  final ImagePicker _picker = ImagePicker();
+
   late TextEditingController _emailController;
   late TextEditingController _nameController;
+  late TextEditingController _phoneController; // Nou
+
   bool _isEditing = false;
   bool _isLoading = false;
+  String? _profileImageUrl;
+  String _createdAt = "-";
+  String _lastLogin = "-";
 
-  final String _lastLogin = "${DateTime.now().day}.${DateTime.now().month}.${DateTime.now().year} ${DateTime.now().hour}:${DateTime.now().minute}";
+  // URL-ul de bază pentru imagini (schimbă cu IP-ul tău dacă e pe telefon real)
+  final String _imageHost = "http://127.0.0.1:8000/";
 
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: widget.email);
-    _nameController = TextEditingController(text: "");
+    _nameController = TextEditingController();
+    _phoneController = TextEditingController();
     _loadUserData();
+  }
+
+  String _formatDateTime(DateTime? dt) {
+    if (dt == null) return "Niciodată";
+    return "${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}";
   }
 
   Future<void> _loadUserData() async {
     setState(() => _isLoading = true);
-    final data = await _userService.getProfile(widget.token);
-    if (data != null) {
-      setState(() {
-        _emailController.text = data['email'] ?? widget.email;
-        _nameController.text = data['full_name'] ?? widget.email.split('@')[0];
-        _isLoading = false;
-      });
+    try {
+      final user = await _userService.getProfile(widget.token);
+      if (user != null) {
+        setState(() {
+          _emailController.text = user.email;
+          _nameController.text = user.fullName ?? "";
+          _profileImageUrl = user.profileImageUrl;
+          _createdAt = _formatDateTime(user.createdAt);
+          _lastLogin = _formatDateTime(user.lastLogin);
+        });
+      }
+    } catch (e) {
+      print("Eroare UI load: $e");
+      _showSnackBar("Nu s-au putut încărca datele.");
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -45,6 +73,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void dispose() {
     _emailController.dispose();
     _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -58,7 +87,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveProfile() async {
     setState(() => _isLoading = true);
-    final result = await _userService.updateProfile(widget.token, _emailController.text, _nameController.text);
+    final result = await _userService.updateProfile(
+      token: widget.token,
+      email: _emailController.text,
+      fullName: _nameController.text,
+    );
     setState(() => _isLoading = false);
 
     if (result != null) {
@@ -69,48 +102,67 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _pickAndUploadImage() async {
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+    );
+
+    if (pickedFile != null) {
+      setState(() => _isLoading = true);
+
+      // Trimitem pickedFile direct (XFile), fără File(pickedFile.path)
+      String? newUrl = await _userService.uploadProfilePicture(widget.token, pickedFile);
+
+      setState(() => _isLoading = false);
+
+      if (newUrl != null) {
+        setState(() => _profileImageUrl = newUrl);
+        _showSnackBar("Imagine actualizată!");
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final double screenWidth = MediaQuery.of(context).size.width;
-
-    // Calculăm o margine adaptivă: 10% din ecran, dar nu mai puțin de 16px
-    double horizontalPadding = screenWidth * 0.10;
-    if (horizontalPadding < 16) horizontalPadding = 16;
+    double horizontalPadding = screenWidth * 0.10 > 16 ? screenWidth * 0.10 : 16;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text("Profilul Meu"),
-        elevation: 0,
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.check : Icons.edit),
-            onPressed: _toggleEdit,
-          ),
+          if (!_isLoading)
+            IconButton(
+              icon: Icon(_isEditing ? Icons.check : Icons.edit),
+              onPressed: _toggleEdit,
+            ),
         ],
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 20),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: Column(
-              children: [
-                _buildProfileHeader(theme),
-                const SizedBox(height: 30),
-                _buildPersonalDetails(theme),
-                const SizedBox(height: 25),
-                _buildSystemInfo(theme),
-                const SizedBox(height: 40),
-                _buildLogoutButton(),
-                const SizedBox(height: 30),
-              ],
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Column(
+                    children: [
+                      _buildProfileHeader(theme),
+                      const SizedBox(height: 30),
+                      _buildPersonalDetails(theme),
+                      const SizedBox(height: 25),
+                      _buildSystemInfo(theme),
+                      const SizedBox(height: 40),
+                      _buildLogoutButton(),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -119,28 +171,43 @@ class _ProfilePageState extends State<ProfilePage> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 40),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer, // Culoare mai discretă pentru header-ul încapsulat
+        color: theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(30),
       ),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 65,
-            backgroundColor: theme.colorScheme.primary,
-            child: CircleAvatar(
-              radius: 60,
-              backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=${_nameController.text}&background=random'),
+          GestureDetector(
+            onTap: _pickAndUploadImage,
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 65,
+                  backgroundColor: theme.colorScheme.primary,
+                  child: CircleAvatar(
+                    radius: 60,
+                    backgroundColor: Colors.grey[200],
+                    backgroundImage: _profileImageUrl != null
+                        ? NetworkImage("$_imageHost$_profileImageUrl")
+                        : NetworkImage('https://ui-avatars.com/api/?name=${_nameController.text}&background=random') as ImageProvider,
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: theme.colorScheme.primary,
+                    child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
           if (!_isEditing)
             Text(
-              _nameController.text,
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onPrimaryContainer
-              ),
+              _nameController.text.isEmpty ? "Utilizator" : _nameController.text,
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimaryContainer),
             )
           else
             Padding(
@@ -148,12 +215,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: TextField(
                 controller: _nameController,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, color: theme.colorScheme.onPrimaryContainer),
-                decoration: InputDecoration(
-                  hintText: "Nume Complet",
-                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.colorScheme.primary.withOpacity(0.5))),
-                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.colorScheme.primary)),
-                ),
+                decoration: const InputDecoration(hintText: "Nume Complet"),
               ),
             ),
         ],
@@ -165,10 +227,11 @@ class _ProfilePageState extends State<ProfilePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("DETALII PERSONALE",
-             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary, letterSpacing: 1.2)),
+        Text("DETALII PERSONALE", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
         const SizedBox(height: 15),
         _buildEditableField(theme, Icons.email_outlined, "Email", _emailController),
+        const SizedBox(height: 10),
+        _buildEditableField(theme, Icons.phone_outlined, "Telefon", _phoneController),
       ],
     );
   }
@@ -207,12 +270,11 @@ class _ProfilePageState extends State<ProfilePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("SECURITATE & SISTEM",
-             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary, letterSpacing: 1.2)),
+        Text("SECURITATE & SISTEM", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
         const SizedBox(height: 15),
-        _buildStaticInfo(theme, Icons.history, "Ultimul login", _lastLogin),
+        _buildStaticInfo(theme, Icons.calendar_today, "Membru din", _createdAt),
         const SizedBox(height: 10),
-        _buildStaticInfo(theme, Icons.security, "Tip Cont", "Utilizator Verificat"),
+        _buildStaticInfo(theme, Icons.history, "Ultimul login", _lastLogin),
       ],
     );
   }

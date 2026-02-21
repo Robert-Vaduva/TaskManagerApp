@@ -6,6 +6,7 @@
 **/.pub/
 build/
 postgres_data/
+media/profile_pics
 
 # --- Specific Files ---
 .env

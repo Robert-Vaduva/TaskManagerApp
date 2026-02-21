@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api import auth
 from app.api.endpoints import user, task
@@ -7,6 +9,7 @@ from app.core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="TaskManager API")
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/media", StaticFiles(directory="app/media"), name="media")
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(user.router, prefix="/users", tags=["Users"])
 app.include_router(task.router, prefix="/tasks", tags=["Tasks"])
