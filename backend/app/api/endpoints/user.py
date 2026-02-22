@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.core.config import settings
@@ -34,7 +34,7 @@ def update_user_me(
     if user_update.email:
         email_exists = db.query(User).filter(User.email == user_update.email).first()
         if email_exists and email_exists.id != current_user.id:
-            raise HTTPException(status_code=400, detail="Email deja înregistrat")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email deja înregistrat")
         current_user.email = user_update.email
 
     if user_update.full_name:
@@ -54,7 +54,7 @@ async def upload_avatar(
     allowed_extensions = ["jpg", "jpeg", "png"]
     extension = file.filename.split(".")[-1].lower()
     if extension not in allowed_extensions:
-        raise HTTPException(status_code=400, detail="Format neacceptat")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Format neacceptat")
 
     file_name = f"user_{current_user.id}_{int(datetime.now().timestamp())}.{extension}"
     file_path = os.path.join(settings.UPLOAD_DIR, file_name)

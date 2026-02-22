@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -14,9 +14,9 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     profile_image_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
-
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), onupdate=datetime.now)
     last_login = Column(DateTime(timezone=True), nullable=True)
 
     tasks = relationship("Task", back_populates="owner", cascade="all, delete-orphan")
+    categories = relationship("Category", back_populates="owner", cascade="all, delete-orphan")

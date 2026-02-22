@@ -3,8 +3,8 @@ from app.models.task import Task
 from app.schemas.task import TaskCreate, TaskUpdate
 
 
-def create_user_task(db: Session, task: TaskCreate, user_id: int):
-    db_task = Task(**task.model_dump(), owner_id=user_id)
+def create_user_task(db: Session, task_data: TaskCreate, user_id: int):
+    db_task = Task(**task_data.model_dump(), owner_id=user_id)
     db.add(db_task)
     db.commit()
     db.refresh(db_task)

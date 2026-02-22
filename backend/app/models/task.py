@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, Boolean
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from datetime import datetime
 from app.database import Base
 import enum
 
@@ -18,12 +18,12 @@ class Task(Base):
     title = Column(String, nullable=False)
     description = Column(String)
     priority = Column(Enum(TaskPriority), default=TaskPriority.MEDIUM)
-    category = Column(String, nullable=True, default="General")
     is_completed = Column(Boolean, default=False)
     deadline = Column(DateTime, nullable=True)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
+    created_at = Column(DateTime(timezone=True), default=datetime.now)
+    updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     owner_id = Column(Integer, ForeignKey("users.id"))
+
     owner = relationship("User", back_populates="tasks")
+    category_rel = relationship("Category", back_populates="tasks")
