@@ -1,3 +1,6 @@
+import 'category_model.dart';
+
+
 class Task {
   final int id;
   final String title;
@@ -6,7 +9,8 @@ class Task {
   final bool isCompleted;
   final DateTime? deadline;
   final DateTime? updatedAt;
-  final String category;
+  final int? categoryId;
+  final Category? category;
 
   Task({
     required this.id,
@@ -16,7 +20,8 @@ class Task {
     required this.isCompleted,
     this.deadline,
     this.updatedAt,
-    this.category="General"
+    this.categoryId,
+    this.category,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -25,13 +30,17 @@ class Task {
       title: json['title'],
       description: json['description'],
       priority: json['priority'],
-      category: json['category'] ?? 'General',
       isCompleted: json['is_completed'] ?? false,
       deadline: json['deadline'] != null
           ? DateTime.parse(json['deadline'])
           : null,
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'])
+          : null,
+      categoryId: json['category_id'],
+
+      category: json['category_rel'] != null
+          ? Category.fromJson(json['category_rel'])
           : null,
     );
   }
@@ -45,6 +54,7 @@ class Task {
       'is_completed': isCompleted,
       'category': category,
       'deadline': deadline?.toIso8601String(),
+      'category_id': categoryId,
     };
   }
 }

@@ -26,7 +26,7 @@ class TaskService {
     }
   }
 
-  Future<Task> createTask(String token, String title, String description, String priority, String category, DateTime? deadline) async {
+  Future<Task> createTask(String token, String title, String description, String priority, int? categoryId, DateTime? deadline) async {
     final response = await http.post(
       Uri.parse('$baseUrl/'),
       headers: {
@@ -37,7 +37,7 @@ class TaskService {
         "title": title,
         "description": description,
         "priority": priority,
-        "category": category,
+        "category_id": categoryId,
         "deadline": deadline?.toIso8601String(),
       }),
     );
@@ -66,7 +66,7 @@ class TaskService {
     }
   }
 
-  Future<void> updateTask(String token, int taskId, String title, String description, String priority, String category, DateTime? deadline) async {
+  Future<void> updateTask(String token, int taskId, String title, String description, String priority, int? categoryId, DateTime? deadline) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/$taskId'),
       headers: {
@@ -77,7 +77,7 @@ class TaskService {
         "title": title,
         "description": description,
         "priority": priority,
-        "category": category,
+        "category_id": categoryId,
         "deadline": deadline?.toIso8601String(),
       }),
     );

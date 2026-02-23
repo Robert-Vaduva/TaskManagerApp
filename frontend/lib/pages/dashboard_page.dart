@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/task_model.dart';
+import '../models/category_model.dart';
 import '../services/task_service.dart';
+import '../services/category_service.dart';
 import '../services/notification_service.dart';
 import 'profile_page.dart';
 import '../main.dart';
@@ -18,19 +20,275 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   final TaskService _taskService = TaskService();
+  final CategoryService _categoryService = CategoryService();
   final NotificationService _notificationService = NotificationService();
   late Future<List<Task>> _tasksFuture;
+  List<Category> _dynamicCategories = [];
 
   String _selectedFilter = 'Toate';
-  String _selectedCategoryFilter = 'Toate';
+  int? _selectedCategoryId;
   String _searchQuery = "";
   String _sortBy = 'priority';
-  final List<String> _categories = ["General", "Muncă", "Personal", "Urgent", "Hobby"];
 
   @override
   void initState() {
     super.initState();
     _tasksFuture = _taskService.getTasks(widget.token);
+
+    _loadCategories();
+  }
+
+  void _showAddCategoryDialog() {
+    final nameC = TextEditingController();
+    String selectedHex = "#4F46E5";
+
+    final List<String> presetColors = [
+      "#4F46E5", "#EF4444", "#10B981", "#F59E0B", "#3B82F6", "#8B5CF6", "#EC4899"
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text("Categorie Nouă"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameC,
+                decoration: const InputDecoration(labelText: "Nume Categorie"),
+                autofocus: true,
+              ),
+              const SizedBox(height: 20),
+              const Text("Alege o culoare:", style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                children: presetColors.map((hex) {
+                  bool isSelected = selectedHex == hex;
+                  return GestureDetector(
+                    onTap: () => setS(() => selectedHex = hex),
+                    child: Container(
+                      width: 35,
+                      height: 35,
+                      decoration: BoxDecoration(
+                        color: Color(int.parse("FF${hex.replaceAll('#', '')}", radix: 16)),
+                        shape: BoxShape.circle,
+                        border: isSelected ? Border.all(color: Colors.black, width: 2) : null,
+                      ),
+                      child: isSelected ? const Icon(Icons.check, size: 20, color: Colors.white) : null,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Anulează")),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameC.text.isNotEmpty) {
+                  final newCat = await _categoryService.createCategory(
+                    widget.token,
+                    nameC.text,
+                    selectedHex
+                  );
+                  if (newCat != null) {
+                    Navigator.pop(ctx);
+                    _loadCategories();
+                  }
+                }
+              },
+              child: const Text("Creează"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showManageCategoriesDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text("Gestionare Categorii"),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800, minWidth: 500),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.9,
+              child: _dynamicCategories.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text("Nu există categorii personalizate.", textAlign: TextAlign.center),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _dynamicCategories.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final cat = _dynamicCategories[index];
+                      return ListTile(
+                        leading: CircleAvatar(backgroundColor: cat.color, radius: 12),
+                        title: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.w500)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _showEditCategoryDialog(cat, setS),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _confirmDeleteCategory(cat, setS),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _refreshTasks();
+              },
+              child: const Text("Închide", style: TextStyle(fontSize: 16))
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteCategory(Category cat, StateSetter dialogSetState) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Ștergi categoria ${cat.name}?"),
+        content: const Text("Task-urile vor fi mutate în 'General'."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Anulează")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              bool success = await _categoryService.deleteCategory(widget.token, cat.id);
+              if (success) {
+                final updatedCats = await _categoryService.getCategories(widget.token);
+                setState(() {
+                  _dynamicCategories = updatedCats;
+                  _tasksFuture = _taskService.getTasks(widget.token);
+                });
+                dialogSetState(() {
+                });
+
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text("Șterge", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditCategoryDialog(Category cat, StateSetter dialogSetState) {
+    final nameC = TextEditingController(text: cat.name);
+
+    String selectedHex = '#${cat.color.value.toRadixString(16).substring(2).toUpperCase()}';
+
+    final List<String> presetColors = [
+      "#4F46E5", "#EF4444", "#10B981", "#F59E0B", "#3B82F6", "#8B5CF6", "#EC4899"
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInternalS) => AlertDialog(
+          title: const Text("Editează Categoria"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameC,
+                decoration: const InputDecoration(labelText: "Nume nou"),
+              ),
+              const SizedBox(height: 20),
+              const Text("Schimbă culoarea:", style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                children: presetColors.map((hex) {
+                  bool isSelected = selectedHex == hex;
+                  return GestureDetector(
+                    onTap: () => setInternalS(() => selectedHex = hex),
+                    child: Container(
+                      width: 35,
+                      height: 35,
+                      decoration: BoxDecoration(
+                        color: Color(int.parse("FF${hex.replaceAll('#', '')}", radix: 16)),
+                        shape: BoxShape.circle,
+                        border: isSelected ? Border.all(color: Colors.black, width: 2) : null,
+                      ),
+                      child: isSelected ? const Icon(Icons.check, size: 20, color: Colors.white) : null,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Anulează")),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameC.text.isNotEmpty) {
+                  await _categoryService.updateCategory(
+                    widget.token,
+                    cat.id,
+                    nameC.text,
+                    selectedHex
+                  );
+
+                  final updatedCats = await _categoryService.getCategories(widget.token);
+                  setState(() {
+                    _dynamicCategories = updatedCats;
+                  });
+
+                  dialogSetState(() {});
+
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text("Salvează"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final cats = await _categoryService.getCategories(widget.token);
+      if (mounted) {
+        setState(() {
+          _dynamicCategories = cats;
+        });
+      }
+    } catch (e) {
+      debugPrint("Eroare la încărcarea categoriilor: $e");
+    }
+  }
+
+  Future<void> _loadInitialData() async {
+    final cats = await _categoryService.getCategories(widget.token);
+    setState(() {
+      _dynamicCategories = cats;
+      _tasksFuture = _taskService.getTasks(widget.token);
+    });
   }
 
   void _refreshTasks() {
@@ -52,16 +310,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'muncă': return Colors.blue;
-      case 'personal': return Colors.green;
-      case 'urgent': return Colors.red;
-      case 'hobby': return Colors.orange;
-      default: return Colors.blueGrey;
-    }
-  }
-
   IconData _getThemeIcon(ThemeMode mode) {
     switch (mode) {
       case ThemeMode.light: return Icons.light_mode;
@@ -77,14 +325,13 @@ class _DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("DevBros Tasks", style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true, // Am centrat titlul pentru a se alinia cu design-ul constrâns
+        centerTitle: true,
         actions: [
           ValueListenableBuilder<ThemeMode>(
             valueListenable: themeNotifier,
             builder: (context, currentMode, child) {
               return PopupMenuButton<ThemeMode>(
                 icon: Icon(_getThemeIcon(currentMode)),
-                tooltip: "Schimbă Tema",
                 onSelected: (ThemeMode mode) async {
                   themeNotifier.value = mode;
                   final prefs = await SharedPreferences.getInstance();
@@ -120,7 +367,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
-      // --- MODIFICARE: Centrare și ConstrainedBox ---
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
@@ -133,7 +379,7 @@ class _DashboardPageState extends State<DashboardPage> {
               final allTasks = snapshot.data ?? [];
               final filteredTasks = allTasks.where((t) {
                 bool matchesStatus = _selectedFilter == 'Toate' || (_selectedFilter == 'Active' ? !t.isCompleted : t.isCompleted);
-                bool matchesCategory = _selectedCategoryFilter == 'Toate' || t.category == _selectedCategoryFilter;
+                bool matchesCategory = _selectedCategoryId == null || t.categoryId == _selectedCategoryId;
                 bool matchesSearch = t.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                                      (t.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
                 return matchesStatus && matchesCategory && matchesSearch;
@@ -145,7 +391,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   case 'priority':
                     const weights = {'high': 0, 'medium': 1, 'low': 2};
                     return (weights[a.priority.toLowerCase()] ?? 1).compareTo(weights[b.priority.toLowerCase()] ?? 1);
-                  case 'date': return b.id!.compareTo(a.id!);
+                  case 'date': return b.id.compareTo(a.id);
                   case 'alpha': return a.title.toLowerCase().compareTo(b.title.toLowerCase());
                   default: return 0;
                 }
@@ -177,50 +423,76 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
-      // --- SFÂRȘIT MODIFICARE ---
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddTaskDialog,
-        backgroundColor: Colors.indigo,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text("Task Nou", style: TextStyle(color: Colors.white)),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: _showAddCategoryDialog,
+            backgroundColor: Colors.indigo.shade100,
+            heroTag: "add_cat_btn",
+            child: const Icon(Icons.category, color: Colors.indigo),
+          ),
+          const SizedBox(height: 16),
+          // Buton Task
+          FloatingActionButton(
+            onPressed: _showAddTaskDialog,
+            backgroundColor: Colors.indigo,
+            heroTag: "add_task_btn",
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ],
       ),
     );
   }
 
-  // Toate metodele rămân identice de aici în jos...
   Widget _buildFilterRow() {
-    return Column(
-      children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: ['Toate', 'Active', 'Finalizate'].map((f) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(f),
-                selected: _selectedFilter == f,
-                onSelected: (s) => setState(() => _selectedFilter = f),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          // Dropdown pentru Status
+          Expanded(
+            flex: 2,
+            child: DropdownButtonFormField<String>(
+              value: _selectedFilter,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelText: "Status",
               ),
-            )).toList(),
+              items: ['Toate', 'Active', 'Finalizate']
+                  .map((f) => DropdownMenuItem(value: f, child: Text(f, style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (val) => setState(() => _selectedFilter = val!),
+            ),
           ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Row(
-            children: ['Toate', ..._categories].map((c) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(c, style: const TextStyle(fontSize: 12)),
-                selected: _selectedCategoryFilter == c,
-                onSelected: (s) => setState(() => _selectedCategoryFilter = c),
-                selectedColor: _getCategoryColor(c).withOpacity(0.3),
+          const SizedBox(width: 8),
+          // Dropdown pentru Categorii
+          Expanded(
+            flex: 3,
+            child: DropdownButtonFormField<int?>(
+              value: _selectedCategoryId,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelText: "Categorie",
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.settings, size: 20),
+                  onPressed: _showManageCategoriesDialog,
+                ),
               ),
-            )).toList(),
+              items: [
+                const DropdownMenuItem<int?>(value: null, child: Text("Toate")),
+                ..._dynamicCategories.map((cat) => DropdownMenuItem<int?>(
+                      value: cat.id,
+                      child: Text(cat.name, overflow: TextOverflow.ellipsis),
+                    )),
+              ],
+              onChanged: (val) => setState(() => _selectedCategoryId = val),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -240,7 +512,7 @@ class _DashboardPageState extends State<DashboardPage> {
             size: 30,
           ),
           onPressed: () async {
-            await _taskService.updateTaskStatus(widget.token, task.id!, !task.isCompleted);
+            await _taskService.updateTaskStatus(widget.token, task.id, !task.isCompleted);
             _refreshTasks();
           },
         ),
@@ -255,7 +527,7 @@ class _DashboardPageState extends State<DashboardPage> {
               spacing: 8,
               children: [
                 _buildPriorityChip(task.priority),
-                _buildCategoryChip(task.category),
+                if (task.category != null) _buildCategoryChip(task.category!),
               ],
             ),
             if (task.deadline != null)
@@ -273,7 +545,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         trailing: IconButton(
           icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-          onPressed: () => _confirmDelete(task.id!),
+          onPressed: () => _confirmDelete(task.id),
         ),
       ),
     );
@@ -288,12 +560,15 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildCategoryChip(String category) {
-    Color color = _getCategoryColor(category);
+  Widget _buildCategoryChip(Category category) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: color.withOpacity(0.2))),
-      child: Text(category, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+        color: category.color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: category.color.withOpacity(0.2))
+      ),
+      child: Text(category.name, style: TextStyle(color: category.color, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -352,7 +627,8 @@ class _DashboardPageState extends State<DashboardPage> {
   void _showAddTaskDialog() {
     final titleC = TextEditingController();
     final descC = TextEditingController();
-    String p = 'medium', c = 'General';
+    String p = 'medium';
+    int? selectedCatId = _dynamicCategories.isNotEmpty ? _dynamicCategories.first.id : null;
     DateTime? d;
 
     showDialog(
@@ -367,9 +643,19 @@ class _DashboardPageState extends State<DashboardPage> {
                 TextField(controller: titleC, decoration: const InputDecoration(labelText: "Titlu")),
                 TextField(controller: descC, decoration: const InputDecoration(labelText: "Descriere")),
                 const SizedBox(height: 15),
-                _buildDropdown("Categorie", c, _categories, (v) => setS(() => c = v!)),
+                DropdownButtonFormField<int>(
+                  value: selectedCatId,
+                  decoration: const InputDecoration(labelText: "Categorie", border: OutlineInputBorder()),
+                  items: _dynamicCategories.map((cat) => DropdownMenuItem(value: cat.id, child: Text(cat.name))).toList(),
+                  onChanged: (v) => setS(() => selectedCatId = v),
+                ),
                 const SizedBox(height: 10),
-                _buildDropdown("Prioritate", p, ['low', 'medium', 'high'], (v) => setS(() => p = v!)),
+                DropdownButtonFormField<String>(
+                  value: p,
+                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
+                  items: ['low', 'medium', 'high'].map((i) => DropdownMenuItem(value: i, child: Text(i.toUpperCase()))).toList(),
+                  onChanged: (v) => setS(() => p = v!),
+                ),
                 TextButton.icon(
                   onPressed: () async {
                     final picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime(2100));
@@ -386,8 +672,8 @@ class _DashboardPageState extends State<DashboardPage> {
             ElevatedButton(
               onPressed: () async {
                 if (titleC.text.isNotEmpty) {
-                  final t = await _taskService.createTask(widget.token, titleC.text, descC.text, p, c, d);
-                  if (d != null) await _notificationService.scheduleNotification(t.id!, "Deadline!", t.title, d!);
+                  final t = await _taskService.createTask(widget.token, titleC.text, descC.text, p, selectedCatId, d);
+                  if (d != null) await _notificationService.scheduleNotification(t.id, "Deadline!", t.title, d!);
                   Navigator.pop(ctx);
                   _refreshTasks();
                 }
@@ -403,7 +689,8 @@ class _DashboardPageState extends State<DashboardPage> {
   void _showEditTaskDialog(Task task) {
     final titleC = TextEditingController(text: task.title);
     final descC = TextEditingController(text: task.description);
-    String p = task.priority, c = task.category;
+    String p = task.priority;
+    int? selectedCatId = task.categoryId;
     DateTime? d = task.deadline;
 
     showDialog(
@@ -418,9 +705,19 @@ class _DashboardPageState extends State<DashboardPage> {
                 TextField(controller: titleC, decoration: const InputDecoration(labelText: "Titlu")),
                 TextField(controller: descC, decoration: const InputDecoration(labelText: "Descriere")),
                 const SizedBox(height: 15),
-                _buildDropdown("Categorie", c, _categories, (v) => setS(() => c = v!)),
+                DropdownButtonFormField<int>(
+                  value: selectedCatId,
+                  decoration: const InputDecoration(labelText: "Categorie", border: OutlineInputBorder()),
+                  items: _dynamicCategories.map((cat) => DropdownMenuItem(value: cat.id, child: Text(cat.name))).toList(),
+                  onChanged: (v) => setS(() => selectedCatId = v),
+                ),
                 const SizedBox(height: 10),
-                _buildDropdown("Prioritate", p, ['low', 'medium', 'high'], (v) => setS(() => p = v!)),
+                DropdownButtonFormField<String>(
+                  value: p,
+                  decoration: const InputDecoration(labelText: "Prioritate", border: OutlineInputBorder()),
+                  items: ['low', 'medium', 'high'].map((i) => DropdownMenuItem(value: i, child: Text(i.toUpperCase()))).toList(),
+                  onChanged: (v) => setS(() => p = v!),
+                ),
                 TextButton.icon(
                   onPressed: () async {
                     final picked = await showDatePicker(context: context, initialDate: d ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2100));
@@ -436,7 +733,7 @@ class _DashboardPageState extends State<DashboardPage> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Anulează")),
             ElevatedButton(
               onPressed: () async {
-                await _taskService.updateTask(widget.token, task.id!, titleC.text, descC.text, p, c, d);
+                await _taskService.updateTask(widget.token, task.id, titleC.text, descC.text, p, selectedCatId, d);
                 Navigator.pop(ctx);
                 _refreshTasks();
               },
@@ -445,15 +742,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-      items: items.map((i) => DropdownMenuItem(value: i, child: Text(i.toUpperCase()))).toList(),
-      onChanged: onChanged,
     );
   }
 
