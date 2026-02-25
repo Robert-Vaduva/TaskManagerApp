@@ -497,7 +497,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildTaskCard(Task task) {
-    bool isExpired = task.deadline != null && task.deadline!.isBefore(DateTime.now()) && !task.isCompleted;
+    // Verificarea expirării acum este precisă la minut
+    bool isExpired = task.deadline != null &&
+                     task.deadline!.isBefore(DateTime.now()) &&
+                     !task.isCompleted;
 
     return Card(
       elevation: 0.5,
@@ -516,7 +519,13 @@ class _DashboardPageState extends State<DashboardPage> {
             _refreshTasks();
           },
         ),
-        title: Text(task.title, style: TextStyle(fontWeight: FontWeight.bold, decoration: task.isCompleted ? TextDecoration.lineThrough : null)),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            decoration: task.isCompleted ? TextDecoration.lineThrough : null
+          )
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -535,9 +544,21 @@ class _DashboardPageState extends State<DashboardPage> {
                 padding: const EdgeInsets.only(top: 8),
                 child: Row(
                   children: [
-                    Icon(Icons.access_time, size: 14, color: isExpired ? Colors.red : Colors.grey),
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: isExpired ? Colors.red : Colors.grey
+                    ),
                     const SizedBox(width: 4),
-                    Text(_formatDate(task.deadline), style: TextStyle(color: isExpired ? Colors.red : Colors.grey, fontSize: 12)),
+                    // MODIFICARE: Folosim formatul care include și ora
+                    Text(
+                      "${_formatDate(task.deadline)} ${task.deadline!.hour.toString().padLeft(2, '0')}:${task.deadline!.minute.toString().padLeft(2, '0')}",
+                      style: TextStyle(
+                        color: isExpired ? Colors.red : Colors.grey,
+                        fontSize: 12,
+                        fontWeight: isExpired ? FontWeight.bold : FontWeight.normal
+                      )
+                    ),
                   ],
                 ),
               ),
@@ -656,13 +677,43 @@ class _DashboardPageState extends State<DashboardPage> {
                   items: ['low', 'medium', 'high'].map((i) => DropdownMenuItem(value: i, child: Text(i.toUpperCase()))).toList(),
                   onChanged: (v) => setS(() => p = v!),
                 ),
-                TextButton.icon(
+                const SizedBox(height: 10),
+                // MODIFICARE: Selector Dată + Oră
+                OutlinedButton.icon(
                   onPressed: () async {
-                    final picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime(2100));
-                    if (picked != null) setS(() => d = picked);
+                    // Pasul 1: Selectare Dată
+                    final pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: d ?? DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2100),
+                    );
+
+                    if (pickedDate != null) {
+                      // Pasul 2: Selectare Oră (automat după dată)
+                      if (!context.mounted) return;
+                      final pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(d ?? DateTime.now()),
+                      );
+
+                      if (pickedTime != null) {
+                        setS(() {
+                          d = DateTime(
+                            pickedDate.year,
+                            pickedDate.month,
+                            pickedDate.day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          );
+                        });
+                      }
+                    }
                   },
-                  icon: const Icon(Icons.calendar_today),
-                  label: Text(d == null ? "Setează Termen" : _formatDate(d)),
+                  icon: const Icon(Icons.alarm),
+                  label: Text(d == null
+                    ? "Setează Termen & Oră"
+                    : "${_formatDate(d)} ${d!.hour.toString().padLeft(2, '0')}:${d!.minute.toString().padLeft(2, '0')}"),
                 ),
               ],
             ),
@@ -672,6 +723,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ElevatedButton(
               onPressed: () async {
                 if (titleC.text.isNotEmpty) {
+                  // Obiectul 'd' conține acum atât data cât și ora setată
                   final t = await _taskService.createTask(widget.token, titleC.text, descC.text, p, selectedCatId, d);
                   if (d != null) await _notificationService.scheduleNotification(t.id, "Deadline!", t.title, d!);
                   Navigator.pop(ctx);
@@ -718,13 +770,43 @@ class _DashboardPageState extends State<DashboardPage> {
                   items: ['low', 'medium', 'high'].map((i) => DropdownMenuItem(value: i, child: Text(i.toUpperCase()))).toList(),
                   onChanged: (v) => setS(() => p = v!),
                 ),
-                TextButton.icon(
+                const SizedBox(height: 10),
+                // MODIFICARE: Selector Dată + Oră pentru Editare
+                OutlinedButton.icon(
                   onPressed: () async {
-                    final picked = await showDatePicker(context: context, initialDate: d ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2100));
-                    if (picked != null) setS(() => d = picked);
+                    // Pasul 1: Alegem Data (pornind de la data actuală a task-ului sau azi)
+                    final pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: d ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+
+                    if (pickedDate != null) {
+                      // Pasul 2: Alegem Ora
+                      if (!context.mounted) return;
+                      final pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(d ?? DateTime.now()),
+                      );
+
+                      if (pickedTime != null) {
+                        setS(() {
+                          d = DateTime(
+                            pickedDate.year,
+                            pickedDate.month,
+                            pickedDate.day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          );
+                        });
+                      }
+                    }
                   },
-                  icon: const Icon(Icons.calendar_today),
-                  label: Text(_formatDate(d)),
+                  icon: const Icon(Icons.access_alarm),
+                  label: Text(d == null
+                    ? "Setează Termen & Oră"
+                    : "${_formatDate(d)} ${d!.hour.toString().padLeft(2, '0')}:${d!.minute.toString().padLeft(2, '0')}"),
                 ),
               ],
             ),
@@ -733,7 +815,14 @@ class _DashboardPageState extends State<DashboardPage> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Anulează")),
             ElevatedButton(
               onPressed: () async {
+                // Trimitem obiectul DateTime complet (dată + oră) către serviciu
                 await _taskService.updateTask(widget.token, task.id, titleC.text, descC.text, p, selectedCatId, d);
+
+                // Actualizăm notificarea dacă data a fost schimbată
+                if (d != null) {
+                  await _notificationService.scheduleNotification(task.id, "Deadline!", titleC.text, d!);
+                }
+
                 Navigator.pop(ctx);
                 _refreshTasks();
               },
