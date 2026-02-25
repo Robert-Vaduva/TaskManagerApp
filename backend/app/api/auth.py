@@ -1,9 +1,12 @@
+"""
+auth.py
+"""
+from datetime import datetime, timedelta
 from fastapi import APIRouter, status
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
+from jose import jwt
 
 from app.models.user import User
 from app.models.category import Category
@@ -17,6 +20,11 @@ router = APIRouter()
 
 
 def create_access_token(data: dict):
+    """
+    create access token
+    :param data:
+    :return:
+    """
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
@@ -25,6 +33,12 @@ def create_access_token(data: dict):
 
 @router.post("/register", response_model=UserOut)
 def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
+    """
+    register user
+    :param user_data:
+    :param db:
+    :return:
+    """
     db_user = db.query(User).filter(User.email == user_data.email).first()
     if db_user:
         raise HTTPException(
@@ -62,14 +76,45 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """
+    login
+    :param form_data:
+    :param db:
+    :return:
+    """
     user = db.query(User).filter(User.email == form_data.username).first()
 
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email sau parolă incorectă")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Email sau parolă incorectă")
     if not security.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email sau parolă incorectă")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Email sau parolă incorectă")
 
     user.last_login = datetime.now()
     db.commit()
     token = create_access_token(data={"sub": str(user.id)})
     return {"status": "success", "access_token": token, "token_type": "bearer"}
+
+
+@router.delete("/delete-account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    delete account
+    :param db:
+    :param current_user:
+    :return:
+    """
+    try:
+        db.delete(current_user)
+        db.commit()
+        return None  # 204 No Content nu returnează corp
+    except Exception as exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="A apărut o eroare la ștergerea contului"
+        ) from exception

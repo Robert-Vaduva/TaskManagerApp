@@ -1,6 +1,9 @@
+"""
+category.py
+"""
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
 
 from app.api.deps import get_db, get_current_user
 from app.schemas.category import CategoryCreate, CategoryOut, CategoryUpdate
@@ -16,6 +19,13 @@ def create_new_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Create a new category
+    :param category:
+    :param db:
+    :param current_user:
+    :return:
+    """
     return crud_category.create_category(db, category_data=category, user_id=current_user.id)
 
 
@@ -24,6 +34,12 @@ def read_my_categories(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Get all categories
+    :param db:
+    :param current_user:
+    :return:
+    """
     return crud_category.get_user_categories(db, user_id=current_user.id)
 
 
@@ -34,6 +50,14 @@ def update_my_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Update a category
+    :param category_id:
+    :param category_update:
+    :param db:
+    :param current_user:
+    :return:
+    """
     updated_cat = crud_category.update_category(
         db,
         category_id=category_id,
@@ -54,6 +78,13 @@ def delete_my_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Delete a category
+    :param category_id:
+    :param db:
+    :param current_user:
+    :return:
+    """
     success = crud_category.delete_category(db, category_id=category_id, user_id=current_user.id)
     if not success:
         raise HTTPException(

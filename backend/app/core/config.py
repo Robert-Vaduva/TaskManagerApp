@@ -1,9 +1,15 @@
+"""
+config.py
+"""
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class Settings:
+    """
+    Settings class
+    """
     PROJECT_NAME: str = "TaskManager API"
     DATABASE_URL: str = os.getenv("DATABASE_URL")
     SECRET_KEY: str = os.getenv("SECRET_KEY")

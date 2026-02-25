@@ -1,3 +1,6 @@
+"""
+main.py
+"""
 import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +31,7 @@ app.include_router(category.router, prefix="/categories", tags=["Category"])
 @app.get("/api/v1/salut")
 @app.get("/")
 async def hello():
+    """Basic Hello World."""
     return {
         "status": "succes",
         "data": {

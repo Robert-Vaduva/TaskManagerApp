@@ -1,17 +1,27 @@
+"""
+task.py
+"""
+import enum
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, Boolean
 from sqlalchemy.orm import relationship
-from datetime import datetime
+
 from app.database import Base
-import enum
 
 
 class TaskPriority(enum.Enum):
+    """
+    Task priority enum
+    """
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
 
 
 class Task(Base):
+    """
+    Task model
+    """
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -23,7 +33,7 @@ class Task(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
 
     owner = relationship("User", back_populates="tasks")
     category_rel = relationship("Category", back_populates="tasks")

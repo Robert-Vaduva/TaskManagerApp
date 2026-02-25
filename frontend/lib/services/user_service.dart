@@ -63,18 +63,15 @@ class UserService {
 
       request.headers['Authorization'] = 'Bearer $token';
 
-      // Citim bytes-ii fișierului (funcționează și pe Web și pe Mobil)
       List<int> imageBytes = await imageFile.readAsBytes();
 
-      // Extragem extensia folosind pachetul path sau manual
       String extension = p.extension(imageFile.path).replaceAll('.', '').toLowerCase();
-      if (extension.isEmpty) extension = 'jpg'; // fallback
+      if (extension.isEmpty) extension = 'jpg';
 
-      // Adăugăm fișierul folosind bytes în loc de path
       request.files.add(http.MultipartFile.fromBytes(
         'file',
         imageBytes,
-        filename: 'avatar.$extension', // Numele de fișier este necesar pentru backend
+        filename: 'avatar.$extension',
         contentType: MediaType('image', extension == 'png' ? 'png' : 'jpeg'),
       ));
 

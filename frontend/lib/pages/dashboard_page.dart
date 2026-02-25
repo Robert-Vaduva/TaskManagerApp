@@ -433,7 +433,6 @@ class _DashboardPageState extends State<DashboardPage> {
             child: const Icon(Icons.category, color: Colors.indigo),
           ),
           const SizedBox(height: 16),
-          // Buton Task
           FloatingActionButton(
             onPressed: _showAddTaskDialog,
             backgroundColor: Colors.indigo,
@@ -450,7 +449,6 @@ class _DashboardPageState extends State<DashboardPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          // Dropdown pentru Status
           Expanded(
             flex: 2,
             child: DropdownButtonFormField<String>(
@@ -467,7 +465,6 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           const SizedBox(width: 8),
-          // Dropdown pentru Categorii
           Expanded(
             flex: 3,
             child: DropdownButtonFormField<int?>(
@@ -497,7 +494,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildTaskCard(Task task) {
-    // Verificarea expirării acum este precisă la minut
     bool isExpired = task.deadline != null &&
                      task.deadline!.isBefore(DateTime.now()) &&
                      !task.isCompleted;
@@ -550,7 +546,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       color: isExpired ? Colors.red : Colors.grey
                     ),
                     const SizedBox(width: 4),
-                    // MODIFICARE: Folosim formatul care include și ora
                     Text(
                       "${_formatDate(task.deadline)} ${task.deadline!.hour.toString().padLeft(2, '0')}:${task.deadline!.minute.toString().padLeft(2, '0')}",
                       style: TextStyle(
@@ -678,10 +673,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   onChanged: (v) => setS(() => p = v!),
                 ),
                 const SizedBox(height: 10),
-                // MODIFICARE: Selector Dată + Oră
                 OutlinedButton.icon(
                   onPressed: () async {
-                    // Pasul 1: Selectare Dată
                     final pickedDate = await showDatePicker(
                       context: context,
                       initialDate: d ?? DateTime.now(),
@@ -690,7 +683,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     );
 
                     if (pickedDate != null) {
-                      // Pasul 2: Selectare Oră (automat după dată)
                       if (!context.mounted) return;
                       final pickedTime = await showTimePicker(
                         context: context,
@@ -723,7 +715,6 @@ class _DashboardPageState extends State<DashboardPage> {
             ElevatedButton(
               onPressed: () async {
                 if (titleC.text.isNotEmpty) {
-                  // Obiectul 'd' conține acum atât data cât și ora setată
                   final t = await _taskService.createTask(widget.token, titleC.text, descC.text, p, selectedCatId, d);
                   if (d != null) await _notificationService.scheduleNotification(t.id, "Deadline!", t.title, d!);
                   Navigator.pop(ctx);
@@ -771,10 +762,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   onChanged: (v) => setS(() => p = v!),
                 ),
                 const SizedBox(height: 10),
-                // MODIFICARE: Selector Dată + Oră pentru Editare
                 OutlinedButton.icon(
                   onPressed: () async {
-                    // Pasul 1: Alegem Data (pornind de la data actuală a task-ului sau azi)
                     final pickedDate = await showDatePicker(
                       context: context,
                       initialDate: d ?? DateTime.now(),
@@ -783,7 +772,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     );
 
                     if (pickedDate != null) {
-                      // Pasul 2: Alegem Ora
                       if (!context.mounted) return;
                       final pickedTime = await showTimePicker(
                         context: context,
@@ -815,10 +803,8 @@ class _DashboardPageState extends State<DashboardPage> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Anulează")),
             ElevatedButton(
               onPressed: () async {
-                // Trimitem obiectul DateTime complet (dată + oră) către serviciu
                 await _taskService.updateTask(widget.token, task.id, titleC.text, descC.text, p, selectedCatId, d);
 
-                // Actualizăm notificarea dacă data a fost schimbată
                 if (d != null) {
                   await _notificationService.scheduleNotification(task.id, "Deadline!", titleC.text, d!);
                 }

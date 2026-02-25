@@ -1,8 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/user_service.dart';
-import '../models/user_model.dart'; // Asigură-te că ai acest import
+import 'package:http/http.dart' as http;
 import 'auth_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -21,7 +22,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   late TextEditingController _emailController;
   late TextEditingController _nameController;
-  late TextEditingController _phoneController; // Nou
+  late TextEditingController _phoneController;
 
   bool _isEditing = false;
   bool _isLoading = false;
@@ -29,8 +30,8 @@ class _ProfilePageState extends State<ProfilePage> {
   String _createdAt = "-";
   String _lastLogin = "-";
 
-  // URL-ul de bază pentru imagini (schimbă cu IP-ul tău dacă e pe telefon real)
   final String _imageHost = "http://127.0.0.1:8000/";
+  final String _defaultAvatarPath = "media/profile_pics/default_user.jpg";
 
   @override
   void initState() {
@@ -60,13 +61,130 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     } catch (e) {
-      print("Eroare UI load: $e");
       _showSnackBar("Nu s-au putut încărca datele.");
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _deleteAccount() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.delete(
+        Uri.parse("${_imageHost}api/v1/auth/delete-account"),
+        headers: {
+          "Authorization": "Bearer ${widget.token}",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const AuthPage()),
+            (Route<dynamic> route) => false,
+          );
+        }
+      } else {
+        _showSnackBar("Eroare la ștergerea contului.");
+      }
+    } catch (e) {
+      if (mounted) _showSnackBar("Eroare de conexiune la server.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _showChangePasswordDialog() async {
+    final TextEditingController passwordController = TextEditingController();
+    final TextEditingController confirmPasswordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Schimbă Parola"),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: "Parolă Nouă"),
+                validator: (val) => (val == null || val.length < 8) ? "Minim 8 caractere" : null,
+              ),
+              TextFormField(
+                controller: confirmPasswordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: "Confirmă Parola"),
+                validator: (val) => val != passwordController.text ? "Parolele nu coincid" : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Anulează")),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                await _updatePasswordOnServer(passwordController.text);
+                if (mounted) Navigator.pop(context);
+              }
+            },
+            child: const Text("Actualizează"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updatePasswordOnServer(String newPassword) async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.put(
+        Uri.parse("${_imageHost}users/me"),
+        headers: {
+          "Authorization": "Bearer ${widget.token}",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({"password": newPassword}),
+      );
+
+      if (response.statusCode == 200) {
+        _showSnackBar("Parola a fost actualizată cu succes!");
+      } else {
+        _showSnackBar("Eroare la actualizarea parolei.");
+      }
+    } catch (e) {
+      _showSnackBar("Eroare de conexiune.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _confirmDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Șterge definitiv contul?"),
+        content: const Text("Această acțiune este ireversibilă. Toate datele tale vor fi șterse definitiv."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Anulează")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _deleteAccount();
+            },
+            child: const Text("Șterge Contul", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -110,10 +228,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (pickedFile != null) {
       setState(() => _isLoading = true);
-
-      // Trimitem pickedFile direct (XFile), fără File(pickedFile.path)
       String? newUrl = await _userService.uploadProfilePicture(widget.token, pickedFile);
-
       setState(() => _isLoading = false);
 
       if (newUrl != null) {
@@ -158,6 +273,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       _buildSystemInfo(theme),
                       const SizedBox(height: 40),
                       _buildLogoutButton(),
+                      const SizedBox(height: 16),
+                      _buildDangerZone(theme),
                     ],
                   ),
                 ),
@@ -167,6 +284,10 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProfileHeader(ThemeData theme) {
+    String finalImageUrl = (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
+        ? "$_imageHost$_profileImageUrl"
+        : "$_imageHost$_defaultAvatarPath";
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 40),
@@ -186,9 +307,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: CircleAvatar(
                     radius: 60,
                     backgroundColor: Colors.grey[200],
-                    backgroundImage: _profileImageUrl != null
-                        ? NetworkImage("$_imageHost$_profileImageUrl")
-                        : NetworkImage('https://ui-avatars.com/api/?name=${_nameController.text}&background=random') as ImageProvider,
+                    backgroundImage: NetworkImage(finalImageUrl),
                   ),
                 ),
                 Positioned(
@@ -230,8 +349,6 @@ class _ProfilePageState extends State<ProfilePage> {
         Text("DETALII PERSONALE", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
         const SizedBox(height: 15),
         _buildEditableField(theme, Icons.email_outlined, "Email", _emailController),
-        const SizedBox(height: 10),
-        _buildEditableField(theme, Icons.phone_outlined, "Telefon", _phoneController),
       ],
     );
   }
@@ -275,6 +392,19 @@ class _ProfilePageState extends State<ProfilePage> {
         _buildStaticInfo(theme, Icons.calendar_today, "Membru din", _createdAt),
         const SizedBox(height: 10),
         _buildStaticInfo(theme, Icons.history, "Ultimul login", _lastLogin),
+        Card(
+          elevation: 0,
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.15),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ListTile(
+            leading: Icon(Icons.lock_outline, color: theme.colorScheme.secondary),
+            title: const Text("Parolă", style: TextStyle(fontSize: 14)),
+            trailing: TextButton(
+              onPressed: _showChangePasswordDialog,
+              child: const Text("Schimbă"),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -305,6 +435,37 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildDangerZone(ThemeData theme) {
+    return InkWell(
+      onTap: _confirmDeleteAccount,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.05),
+          border: Border.all(color: Colors.red.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Șterge Contul", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                  Text("Acțiunea este ireversibilă", style: TextStyle(fontSize: 12, color: Colors.red)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.red),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _confirmLogout() {
     showDialog(
       context: context,
@@ -325,6 +486,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.fixed,
+      ),
+    );
   }
 }

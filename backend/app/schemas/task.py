@@ -1,12 +1,18 @@
-from pydantic import BaseModel
+"""
+task.py
+"""
 from typing import Optional
 from datetime import datetime
+from pydantic import BaseModel
 
 from app.models.task import TaskPriority
 from app.schemas.category import CategoryOut
 
 
 class TaskBase(BaseModel):
+    """
+    Task base model
+    """
     title: str
     description: Optional[str] = None
     priority: TaskPriority = TaskPriority.MEDIUM
@@ -15,10 +21,16 @@ class TaskBase(BaseModel):
 
 
 class TaskCreate(TaskBase):
+    """
+    Task create model
+    """
     pass
 
 
 class TaskOut(TaskBase):
+    """
+    Task output model
+    """
     id: int
     owner_id: int
     is_completed: bool
@@ -27,9 +39,15 @@ class TaskOut(TaskBase):
     category_rel: Optional[CategoryOut] = None
 
     class Config:
+        """
+        Config class
+        """
         from_attributes = True
 
 class TaskUpdate(BaseModel):
+    """
+    Task update model
+    """
     title: Optional[str] = None
     description: Optional[str] = None
     priority: Optional[TaskPriority] = None
@@ -38,4 +56,7 @@ class TaskUpdate(BaseModel):
     deadline: Optional[datetime] = None
 
     class Config:
+        """
+        Config class
+        """
         from_attributes = True

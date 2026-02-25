@@ -1,3 +1,6 @@
+"""
+logger.py
+"""
 import logging
 import sys
 
@@ -5,6 +8,10 @@ LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 
 
 def setup_logging():
+    """
+    Setup logging
+    :return:
+    """
     logging.basicConfig(
         level=logging.INFO,
         format=LOG_FORMAT,
