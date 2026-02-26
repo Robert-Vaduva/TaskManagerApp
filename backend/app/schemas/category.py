@@ -24,7 +24,7 @@ class CategoryOut(CategoryBase):
     id: int
     owner_id: int
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 class CategoryUpdate(BaseModel):

@@ -38,7 +38,7 @@ class TaskOut(TaskBase):
     updated_at: datetime
     category_rel: Optional[CategoryOut] = None
 
-    class Config:
+    class ConfigDict:
         """
         Config class
         """
@@ -55,7 +55,7 @@ class TaskUpdate(BaseModel):
     is_completed: Optional[bool] = None
     deadline: Optional[datetime] = None
 
-    class Config:
+    class ConfigDict:
         """
         Config class
         """
