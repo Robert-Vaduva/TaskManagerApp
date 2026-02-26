@@ -7,19 +7,17 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine
         env:
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
           POSTGRES_DB: test_db
         ports:
-          # Mapăm portul 5433 de la "exterior" la 5432 "interior"
-          # ca să se potrivească cu ce ai tu în cod/configurări
           - 5433:5432
         options: >-
           --health-cmd pg_isready
@@ -30,24 +28,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python 3.14
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.14-dev' # Folosim versiunea de development 3.14
+        python-version: '3.11'
+        cache: 'pip'
 
     - name: Install dependencies
       run: |
         cd backend
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest httpx # Ne asigurăm că avem tool-urile de testare
 
     - name: Run Syntax Check
+      run: |
+        cd backend
+        python -m compileall .
+
+    - name: Run Tests with Pytest
       env:
-        # Injectăm variabilele de mediu necesare pentru ca codul să nu crape la pornire
         DATABASE_URL: postgresql://test_user:test_password@localhost:5433/test_db
         SECRET_KEY: secret_pentru_teste
         ALGORITHM: HS256
       run: |
         cd backend
-        # Această comandă verifică dacă toate importurile și sintaxa sunt OK
-        python -m compileall .
+        python -m pytest

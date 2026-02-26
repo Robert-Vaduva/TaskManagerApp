@@ -8,6 +8,12 @@ build/
 postgres_data/
 media/profile_pics
 
+# --- Databases & Local Storage ---
+*.db
+*.db-journal
+*.sqlite3
+test.db
+
 # --- Specific Files ---
 .env
 .DS_Store

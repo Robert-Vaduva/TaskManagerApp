@@ -27,4 +27,12 @@ Logger:
     logger.info("Cineva a încercat să se logheze")
     logger.error(f"Eroare critică la login: {str(e)}")
 
+Docker:
+    docker build -t task-manager-backend .
+    docker run -d -p 8000:8000 --name task-manager-container task-manager-backend
+    
+    docker-compose up --build -d
+    docker-compose logs -f api
+    docker-compose down
+
 pip freeze > requirements.txt
