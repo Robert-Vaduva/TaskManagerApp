@@ -7,6 +7,9 @@ import '../services/notification_service.dart';
 import 'profile_page.dart';
 import '../main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 
 class DashboardPage extends StatefulWidget {
   final String email;
@@ -29,6 +32,9 @@ class _DashboardPageState extends State<DashboardPage> {
   int? _selectedCategoryId;
   String _searchQuery = "";
   String _sortBy = 'priority';
+  String _userFullName = "";
+  String _userEmail = "";
+  bool _isProfileLoading = true;
 
   @override
   void initState() {
@@ -36,6 +42,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _tasksFuture = _taskService.getTasks(widget.token);
 
     _loadCategories();
+    _fetchUserProfile();
   }
 
   void _showAddCategoryDialog() {
@@ -283,6 +290,31 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _fetchUserProfile() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://localhost:8000/users/me'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _userFullName = data['full_name'];
+            _userEmail = data['email'];
+            _isProfileLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Eroare profil: $e");
+    }
+  }
+
   Future<void> _loadInitialData() async {
     final cats = await _categoryService.getCategories(widget.token);
     setState(() {
@@ -363,6 +395,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 MaterialPageRoute(builder: (context) => ProfilePage(email: widget.email, token: widget.token)),
               );
               if (updatedEmail != null) _refreshTasks();
+              if (mounted) {
+                _fetchUserProfile();
+              }
             },
           ),
         ],
@@ -595,7 +630,9 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Salut, ${widget.email.split('@')[0]}!", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text(
+              _isProfileLoading ? "Se încarcă..." :"Salut, $_userFullName!",
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const Text("Iată ce ai de făcut astăzi:"),
           const SizedBox(height: 12),
           TextField(
