@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'dart:io';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/user_model.dart';
-import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as p;
+import '../services/api_config.dart';
 
 class UserService {
-  final String baseUrl = "http://127.0.0.1:8000/users";
+  final String baseUrl = "${ApiConfig.baseUrl}/users";
 
   Future<User?> updateProfile({
     required String token,

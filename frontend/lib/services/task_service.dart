@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/task_model.dart';
+import '../services/api_config.dart';
+
 
 class TaskService {
-  final String baseUrl = "http://127.0.0.1:8000/tasks";
+  final String baseUrl = "${ApiConfig.baseUrl}/tasks";
 
   Future<List<Task>> getTasks(String token) async {
     final response = await http.get(
