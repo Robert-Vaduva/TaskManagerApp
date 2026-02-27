@@ -7,9 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine
-from app.models.user import Base as UserBase
-from app.models.task import Base as TaskBase
-from app.models.category import Base as CategoryBase
+from app.models.user import User, Base as UserBase
+from app.models.task import Task
+from app.models.category import Category
 from app.api import auth
 from app.api.endpoints import user, task, category
 from app.core.config import settings
