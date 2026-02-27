@@ -13,10 +13,19 @@ from app.core.config import settings
 
 app = FastAPI(title="TaskManager API")
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+origins=[
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://10.0.2.2:8000",
+    "https://robert-vaduva.github.io",
+    "https://robert-vaduva.github.io/TaskManagerApp"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
