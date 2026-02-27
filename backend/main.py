@@ -6,10 +6,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.database import engine
+from app.models.user import Base as UserBase
+from app.models.task import Base as TaskBase
+from app.models.category import Base as CategoryBase
 from app.api import auth
 from app.api.endpoints import user, task, category
 from app.core.config import settings
 
+UserBase.metadata.create_all(bind=engine)
 
 app = FastAPI(title="TaskManager API")
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
