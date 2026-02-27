@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:lottie/lottie.dart';
 import 'dashboard_page.dart';
+import 'package:frontend/services/api_config.dart';
+
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -21,7 +23,7 @@ class _AuthPageState extends State<AuthPage> {
   String _message = "";
   bool _isSuccess = false;
 
-  final String baseUrl = "http://127.0.0.1:8000/api/v1/auth";
+  final String baseUrl = "${ApiConfig.baseUrl}/api/v1/auth";
 
   Future<void> _submit() async {
     setState(() {
